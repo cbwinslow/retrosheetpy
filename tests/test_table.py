@@ -358,7 +358,8 @@ def _describe(pid: int) -> str:
     try:
         fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
         cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode()[:70]
-        return f"pid {pid} state={fields[0]} ppid={fields[1]} pgrp={fields[2]} session={fields[3]} {cmd}"
+        state, ppid, pgrp, session = fields[0], fields[1], fields[2], fields[3]
+        return f"pid {pid} state={state} ppid={ppid} pgrp={pgrp} session={session} {cmd}"
     except OSError:
         return f"pid {pid} (gone)"
 
