@@ -87,8 +87,9 @@ downloaded once, with its SHA-256 recorded, and each season is unpacked beside i
 
 The output is compared byte for byte with the real Chadwick C tools by `scripts/parity.py`: 24
 seasons between 1910 and 2025 (including the Federal League and deduced-game files), all tables, plus
-option variants: 288 of 288 identical. The unit tests (`pytest`) use a made-up two-season fixture and
-need no network; with `CHADWICK_BIN` set they also compare against the C tools.
+option variants: 288 of 288 identical. Those 24 seasons asked for as one Table give 3,441,587 `events`
+rows and 43,566 `games` rows, equal to the C outputs joined. The unit tests (`pytest`) use a made-up
+two-season fixture and need no network; with `CHADWICK_BIN` set they also compare against the C tools.
 
 Two things are *not* compared with C, on purpose: the C `cwbox -S` (SportsML) crashes on real data,
 and the C `cwbox -X` (XML) prints one attribute (`pb`) from uninitialised memory. chadwickpy
