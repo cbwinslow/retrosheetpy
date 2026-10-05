@@ -72,11 +72,11 @@ wheels = [
 
 [[package]]
 name = "chadwickpy"
-version = "0.1.1"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/78/fb/e95a19540ce4c27709c99d35fd2937c56dbdf0f2b75074d519eb9977d44b/chadwickpy-0.1.1.tar.gz", hash = "sha256:1db9570560d9c87110abf79e5b0a4a338f1f6a26c52b9706734edd5353a97f02", size = 348696, upload-time = "2026-10-05T01:32:59.207Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/cf/bf47ab340c914277f53721767685fea5a0e8ac5b32ce922962dbff6c02ca/chadwickpy-0.2.0.tar.gz", hash = "sha256:266d196d0b180002a682510861ef35a128bae998a24c3147b2c862fa6130d760", size = 354227, upload-time = "2026-10-05T08:12:02.547Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/95/1e/7cf05d606720e7bfba7a435b92b8f61430527e1823c49ea1dcddda63995d/chadwickpy-0.1.1-py3-none-any.whl", hash = "sha256:522a846721a0131ba5a3349e869f5e149b644c87985e92384750498bf2e24b9d", size = 116505, upload-time = "2026-10-05T01:32:57.951Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/ae/2fc85c284bc6ac860d05f8500577df40d52cb42c326ba334fc030d8fd782/chadwickpy-0.2.0-py3-none-any.whl", hash = "sha256:b2e13d78f963baf1e1287a69ebcf464511b827d87d50ff7973cc2ef11a41baaa", size = 118679, upload-time = "2026-10-05T08:12:01.31Z" },
 ]
 
 [[package]]
@@ -464,7 +464,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "chadwickpy", specifier = ">=0.1.1" }]
+requires-dist = [{ name = "chadwickpy", specifier = ">=0.2.0" }]
 
 [package.metadata.requires-dev]
 dev = [

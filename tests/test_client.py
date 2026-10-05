@@ -140,7 +140,7 @@ def test_interrupted_update_is_a_cache_miss_not_an_integrity_error(tmp_path, mon
     fetch = FakeFetch(make_zip({"x.csv": b"1"}))
     client = Client(tmp_path, fetch=fetch)
     client.download(RES)
-    real = client_module._atomic_write
+    real = client_module.atomic_write
     calls = []
 
     def stop_after_payload(path, payload):
@@ -149,10 +149,10 @@ def test_interrupted_update_is_a_cache_miss_not_an_integrity_error(tmp_path, mon
             raise KeyboardInterrupt
         real(path, payload)
 
-    monkeypatch.setattr(client_module, "_atomic_write", stop_after_payload)
+    monkeypatch.setattr(client_module, "atomic_write", stop_after_payload)
     with pytest.raises(KeyboardInterrupt):
         client.download(RES, force=True)
-    monkeypatch.setattr(client_module, "_atomic_write", real)
+    monkeypatch.setattr(client_module, "atomic_write", real)
     again = client.download(RES, refetch_on_mismatch=False)
     assert again.sha256
 
