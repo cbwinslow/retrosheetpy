@@ -13,6 +13,7 @@ from retrosheetpy import (
     iter_zip_members,
     resolve,
 )
+from retrosheetpy import client as client_module
 
 
 def make_zip(members: dict[str, bytes]) -> bytes:
@@ -127,9 +128,30 @@ def test_unreadable_cache_metadata_is_not_trusted(tmp_path):
     art.local_path.with_name(art.local_path.name + ".json").write_text("{not json")
     client.download(RES)
     assert len(fetch.calls) == 2
+    art.local_path.with_name(art.local_path.name + ".json").write_text("{}")
     with pytest.raises(IntegrityError):
-        art.local_path.with_name(art.local_path.name + ".json").write_text("{}")
         client.download(RES, refetch_on_mismatch=False)
+
+
+def test_interrupted_update_is_a_cache_miss_not_an_integrity_error(tmp_path, monkeypatch):
+    fetch = FakeFetch(make_zip({"x.csv": b"1"}))
+    client = Client(tmp_path, fetch=fetch)
+    client.download(RES)
+    real = client_module._atomic_write
+    calls = []
+
+    def stop_after_payload(path, payload):
+        calls.append(path)
+        if len(calls) == 2:  # the metadata write of this update
+            raise KeyboardInterrupt
+        real(path, payload)
+
+    monkeypatch.setattr(client_module, "_atomic_write", stop_after_payload)
+    with pytest.raises(KeyboardInterrupt):
+        client.download(RES, force=True)
+    monkeypatch.setattr(client_module, "_atomic_write", real)
+    again = client.download(RES, refetch_on_mismatch=False)
+    assert again.sha256
 
 
 def test_cache_for_different_seasons_does_not_collide(tmp_path):

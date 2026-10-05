@@ -98,6 +98,8 @@ class Client:
             size=len(payload),
             retrieved_at=datetime.now(UTC),
         )
+        # Drop the old record first: a stop between the two writes is then a plain cache miss.
+        meta.unlink(missing_ok=True)
         _atomic_write(data, payload)
         _atomic_write(meta, art.to_json().encode())
         return art
