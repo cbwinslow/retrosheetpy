@@ -13,7 +13,7 @@ import os
 import re
 import sqlite3
 import tempfile
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -126,7 +126,7 @@ class Table:
 
     # --- rows ----------------------------------------------------------------------------------
 
-    def _records(self) -> Iterator[list[str]]:
+    def _records(self) -> Generator[list[str], None, None]:
         """Header-stripped rows of every season, in order, with the column selection applied."""
         header: list[str] | None = None
         picks: list[int] | None = None
@@ -155,11 +155,21 @@ class Table:
 
     def rows(self) -> Iterator[tuple[str, ...]]:
         """The rows as tuples, in ``columns`` order. Fastest way to read."""
-        return (tuple(r) for r in self._records())
+        records = self._records()
+        try:
+            for r in records:
+                yield tuple(r)
+        finally:
+            records.close()  # stop the tool now, whether or not the garbage collector is quick
 
     def __iter__(self) -> Iterator[dict[str, str]]:
         cols = self.columns
-        return (dict(zip(cols, r, strict=True)) for r in self._records())
+        records = self._records()
+        try:
+            for r in records:
+                yield dict(zip(cols, r, strict=True))
+        finally:
+            records.close()  # stop the tool now, whether or not the garbage collector is quick
 
     def load(self) -> list[dict[str, str]]:
         """All rows as a list of dicts (keeps everything in memory)."""
