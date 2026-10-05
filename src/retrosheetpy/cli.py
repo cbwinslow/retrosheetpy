@@ -2,8 +2,9 @@
 
 import argparse
 import sys
+from pathlib import Path
 
-from retrosheetpy import season
+from retrosheetpy import season, tables
 from retrosheetpy._meta import __version__
 from retrosheetpy.errors import RetrosheetError
 
@@ -18,6 +19,11 @@ def _parser() -> argparse.ArgumentParser:
     g = sub.add_parser("get", help="download and unpack a season into the cache")
     g.add_argument("year", type=int)
     g.add_argument("--force", action="store_true", help="download again even if cached")
+    for name, table in tables.TABLES.items():
+        t = sub.add_parser(name, help=f"run {table.tool} on a season (downloads it if needed)")
+        t.add_argument("year", type=int)
+        t.add_argument("--out", help="folder to write the file into (default: print to stdout)")
+        t.add_argument("-j", "--jobs", type=int, help="worker processes (default: automatic)")
     sub.add_parser("list", help="show the seasons that are cached")
     c = sub.add_parser("cache", help="manage the cache")
     c.add_argument("action", choices=["path", "verify", "clear"])
@@ -39,6 +45,14 @@ def main(argv: list[str] | None = None) -> int:
             s = season.get(args.year, cache=args.cache_dir, force=args.force, notice=_notice)
             print(f"{s.year}: {len(s.event_files)} event files, {len(s.roster_files)} rosters")
             print(s.folder)
+        elif args.command in tables.TABLES:
+            table = tables.TABLES[args.command]
+            s = season.get(args.year, cache=args.cache_dir, notice=_notice)
+            if args.out:
+                dest = Path(args.out) / f"{args.year}-{table.name}.{table.suffix}"
+                print(tables.write(table, s, dest, jobs=args.jobs))
+            else:
+                tables.run(table, s, sys.stdout.buffer, jobs=args.jobs)
         elif args.command == "list":
             for year in season.cached_seasons(args.cache_dir):
                 print(year)
