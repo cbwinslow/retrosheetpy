@@ -89,6 +89,7 @@ jobs:
         run: |
           export CHADWICK_BIN="$HOME/chadwick-parity-install/bin"
           test -x "$CHADWICK_BIN/cwevent" || { echo "Chadwick build missing"; exit 1; }
+          set -o pipefail  # otherwise the pipe reports tee's status and failing tests pass CI
           uv run --with pytest --with pandas pytest -q -rs -p no:cacheprovider | tee pytest.out
           # A skipped test compared nothing: with Chadwick and pandas present, nothing may be skipped.
           if grep -q '^SKIPPED' pytest.out; then echo "tests were skipped"; exit 1; fi
