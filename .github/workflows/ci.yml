@@ -13,6 +13,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CHADWICK_REF: c685ab5 # the same pinned commit chadwickpy is compared with
+
 jobs:
   lint:
     name: lint and types
@@ -47,6 +50,49 @@ jobs:
           enable-cache: true
       - run: uv run --with pytest pytest -q -rs -p no:cacheprovider
 
+  parity:
+    name: parity with Chadwick (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # hatch-vcs reads the version from git tags
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - name: Cache Chadwick (sources and build)
+        id: chadwick-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/chadwick-parity
+            ~/chadwick-parity-install
+          key: chadwick-parity-${{ env.CHADWICK_REF }}
+      - name: Build Chadwick at the pinned commit
+        if: steps.chadwick-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y -q autoconf automake libtool
+          git clone https://github.com/chadwickbureau/chadwick.git "$HOME/chadwick-parity"
+          cd "$HOME/chadwick-parity"
+          git checkout "$CHADWICK_REF"
+          autoreconf -i
+          ./configure --prefix="$HOME/chadwick-parity-install"
+          make -j2
+          make install
+      - name: Run the tests (they compare with the real tools)
+        run: |
+          export CHADWICK_BIN="$HOME/chadwick-parity-install/bin"
+          test -x "$CHADWICK_BIN/cwevent" || { echo "Chadwick build missing"; exit 1; }
+          uv run --with pytest --with pandas pytest -q -rs -p no:cacheprovider | tee pytest.out
+          # A skipped test compared nothing: with Chadwick and pandas present, nothing may be skipped.
+          if grep -q '^SKIPPED' pytest.out; then echo "tests were skipped"; exit 1; fi
+
   package:
     name: build and clean-install check
     runs-on: ubuntu-latest
@@ -75,11 +121,12 @@ jobs:
   # Branch protection requires this one check name.
   test:
     name: test
-    needs: [lint, tests, package]
+    needs: [lint, tests, parity, package]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded
         run: |
           [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.tests.result }}" = success ] \
+            && [ "${{ needs.parity.result }}" = success ] \
             && [ "${{ needs.package.result }}" = success ] || { echo "a job failed"; exit 1; }
