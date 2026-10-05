@@ -5,8 +5,10 @@ the season's folder. It runs as a subprocess (``python -m chadwickpy``): that ke
 change out of this process, and chadwickpy spreads the team files over the CPU cores itself.
 """
 
+import contextlib
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -15,6 +17,7 @@ from contextlib import contextmanager
 from typing import IO, TYPE_CHECKING, Literal
 
 from retrosheetpy.errors import ToolError
+from retrosheetpy.names import home_team
 from retrosheetpy.options import MAX_JOBS, Options
 from retrosheetpy.tools import Tool
 
@@ -50,9 +53,11 @@ def files_for(season: "Season", opts: Options) -> list[str]:
     """The season's event file names, narrowed to the requested home teams (in the given order)."""
     if not opts.home:
         return [p.name for p in season.event_files]
+    # With home= only the files named by home team are read. The year-named deduced-game files
+    # (1920.EDA) mix many teams, so they are left out here; see Opts.home.
     by_team: dict[str, list[str]] = {}
-    for path in season.event_files:
-        by_team.setdefault(path.name[4:7].upper(), []).append(path.name)
+    for path in season.team_event_files:
+        by_team.setdefault(home_team(path.name) or "", []).append(path.name)
     missing = [t for t in opts.home if t not in by_team]
     if missing:
         raise ValueError(
@@ -90,6 +95,22 @@ def command(
     return cmd + (files if files is not None else files_for(season, opts))
 
 
+def _stop(proc: "subprocess.Popen[bytes]") -> None:
+    """Kill the tool and every worker process it started."""
+    if os.name == "posix":
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(proc.pid, signal.SIGKILL)
+    else:
+        proc.kill()
+
+
+def _stop_stragglers(proc: "subprocess.Popen[bytes]") -> None:
+    """After the tool has ended: stop any worker still left in its process group."""
+    if os.name == "posix":
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(proc.pid, signal.SIGKILL)
+
+
 @contextmanager
 def stream(
     tool: Tool,
@@ -108,8 +129,14 @@ def stream(
         raise ToolError(f"no event files for {season.year}")
     cmd = command(tool, season, opts, box=box, files=files)
     with tempfile.TemporaryFile() as errors:
+        # Own process group: chadwickpy starts worker processes, and killing only its main process
+        # would leave them running for ever. Stopping the group stops them too.
         proc = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
-            cmd, cwd=season.folder, stdout=subprocess.PIPE, stderr=errors
+            cmd,
+            cwd=season.folder,
+            stdout=subprocess.PIPE,
+            stderr=errors,
+            start_new_session=os.name == "posix",
         )
         assert proc.stdout is not None  # noqa: S101 - guaranteed by stdout=PIPE
         finished = False
@@ -118,9 +145,10 @@ def stream(
             finished = True
         finally:
             if not finished:
-                proc.kill()
+                _stop(proc)
             proc.stdout.close()
             code = proc.wait()
+            _stop_stragglers(proc)
         if code != 0:
             errors.seek(0)
             tail = errors.read().decode("latin-1").strip()[-500:]

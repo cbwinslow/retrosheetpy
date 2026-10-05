@@ -41,11 +41,23 @@ They are Chadwick's six programs, with Chadwick's names and Chadwick's column na
 Every column Chadwick can print is printed by default. Values are the strings Chadwick prints; a
 missing value is an empty string, never zero. Nothing is typed or guessed.
 
+## What is covered
+
+Regular-season games from Retrosheet's decade event archives, seasons **1908 to the latest**
+(Retrosheet's 1910s archive also holds 1908 and 1909). All event files in an archive are used:
+team files (`2010ANA.EVA`, the Federal League's `.EVF`, `.EVR`) and the deduced-game files
+(`.EDN`, `.EDA`, `.EDF`, including those named by year alone, such as `1920.EDA`).
+
+Not included yet: postseason, all-star and Negro Leagues event files (separate archives), games
+Retrosheet has only as box scores, and seasons before 1908. So game counts can be lower than
+Retrosheet's own per-season CSV: for 2010 it lists 2,463 games and this package gives 2,430, and the
+difference is exactly the 32 postseason and 1 all-star game.
+
 ## Options (the same for every table)
 
 | Option | Meaning |
 | --- | --- |
-| `home="NYA"` or `["NYA", "BOS"]` | only those home teams' files (Retrosheet files are named by home team) |
+| `home="NYA"` or `["NYA", "BOS"]` | only those home teams' files (Retrosheet files are named by home team). Games Retrosheet deduced from box scores sit in files named by year (`1920.EDA`) that mix teams, so `home=` leaves those out. |
 | `game="ANA201004050"` | only that game |
 | `start="0405"`, `end="0430"` | date range, `mmdd` |
 | `fields=...`, `extended=...` | choose columns by Chadwick's field numbers (`"0-5,9"`, `[0, 7]`). Choose one and the other is left out. |
@@ -90,6 +102,10 @@ seasons between 1910 and 2025 (including the Federal League and deduced-game fil
 option variants: 288 of 288 identical. Those 24 seasons asked for as one Table give 3,441,587 `events`
 rows and 43,566 `games` rows, equal to the C outputs joined. The unit tests (`pytest`) use a made-up
 two-season fixture and need no network; with `CHADWICK_BIN` set they also compare against the C tools.
+
+That comparison runs the C tools on the same file list, so it cannot notice a file we left out. A
+separate check does: every file in all twelve decade archives is kept, and for 1908, 1909, 1914, 1920,
+1962 and 2010 the number of `games` rows equals the number of games in the raw event files.
 
 Two things are *not* compared with C, on purpose: the C `cwbox -S` (SportsML) crashes on real data,
 and the C `cwbox -X` (XML) prints one attribute (`pb`) from uninitialised memory. chadwickpy

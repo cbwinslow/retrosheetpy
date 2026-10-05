@@ -64,9 +64,10 @@ def resolve(product: Product, season: int | None = None) -> Resource:
         return Resource(product, f"{BASE}/downloads/{y}/{name}", name, season=y)
     if product is Product.EVENTS_DECADE:
         y = _need_season(product, season)
-        if not 1910 <= y <= date.today().year:
+        # Retrosheet's 1910s archive also holds 1908 and 1909 (checked against the real file).
+        if not 1908 <= y <= date.today().year:
             raise ValueError(f"no event decade archive for {y}")
-        name = f"{y // 10 * 10}seve.zip"
+        name = f"{max(y // 10 * 10, 1910)}seve.zip"
         return Resource(product, f"{BASE}/events/{name}", name, season=y, group=name[:-4])
     if product is Product.BOX_ARCHIVE:
         y = _need_season(product, season)

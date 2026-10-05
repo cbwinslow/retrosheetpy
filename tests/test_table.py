@@ -338,3 +338,64 @@ def test_boxscore_filters_and_refusals(cache: Path) -> None:
     assert q("boxscores", 2010, cache, home="BBB").text().count("Game of") == 1
     with pytest.raises(ValueError, match="no fields"):
         q("boxscores", 2010, cache, fields=0)
+
+
+def _processes_running_in(folder: Path) -> list[int]:
+    """Process ids whose working directory is ``folder`` (Linux). The season folder is unique to
+    each test, and every tool process and worker runs inside it."""
+    found = []
+    for entry in Path("/proc").glob("[0-9]*"):
+        try:
+            if (entry / "cwd").resolve() == folder.resolve():
+                found.append(int(entry.name))
+        except OSError:
+            continue  # the process ended while we looked
+    return found
+
+
+def _wait_until_none_left(folder: Path, seconds: float = 10) -> list[int]:
+    import time
+
+    deadline = time.time() + seconds
+    left = _processes_running_in(folder)
+    while left and time.time() < deadline:
+        time.sleep(0.1)
+        left = _processes_running_in(folder)
+    return left
+
+
+needs_proc = pytest.mark.skipif(not Path("/proc/self/cwd").exists(), reason="needs Linux /proc")
+
+
+@needs_proc
+def test_stopping_early_leaves_no_worker_processes_behind(cache: Path) -> None:
+    """chadwickpy runs team files in worker processes. Killing only its main process would leave
+    them running (this leaked 36 idle processes before); the whole process group must stop."""
+    # Big enough that the output cannot fit in the pipe, so the tool is still running (blocked
+    # on writing) when we stop reading, and has two team files so chadwickpy starts two workers.
+    big = {
+        name: "".join(
+            fake.game(2010, home, away, f"{m:02d}{d:02d}")
+            for m in range(4, 10)
+            for d in range(1, 29)
+        )
+        for name, home, away in (("2010AAA.EVN", "AAA", "BBB"), ("2010BBB.EVA", "BBB", "AAA"))
+    }
+    zipped = zip_with({k: v.encode("latin-1") for k, v in big.items()})
+    t = rs.events(2010, cache=cache, fetch=lambda url: zipped, jobs=2)
+    it = iter(t)
+    next(it)
+    folder = cache / "seasons" / "2010"
+    assert _processes_running_in(folder), "the tool should be running right now"
+    it.close()
+    assert _wait_until_none_left(folder) == [], "worker processes were left running"
+
+
+@needs_proc
+def test_a_tool_failure_leaves_no_processes_behind(cache: Path) -> None:
+    broken = fake.FILES["2010AAA.EVN"].replace("info,date,2010/04/06\n", "")
+    zipped = zip_with({"2010AAA.EVN": broken.encode("latin-1")})
+    t = rs.events(2010, cache=cache, fetch=lambda url: zipped, jobs=2)
+    with pytest.raises(ToolError):
+        t.load()
+    assert _wait_until_none_left(cache / "seasons" / "2010") == []
