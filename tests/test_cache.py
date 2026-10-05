@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from retrosheetpy import IntegrityError, Season, cache_dir
+from retrosheetpy import Season, SeasonNotFoundError, cache_dir
 from retrosheetpy import cache as season_module
 from retrosheetpy.cache import get
 from retrosheetpy.cli import main
@@ -69,7 +69,7 @@ def test_two_seasons_share_one_decade_download(tmp_path: Path) -> None:
 
 
 def test_missing_season_is_an_error_and_leaves_no_folder(tmp_path: Path) -> None:
-    with pytest.raises(IntegrityError):
+    with pytest.raises(SeasonNotFoundError, match="it has seasons 2010 to 2011"):
         get(2012, cache=tmp_path, fetch=Fetch(decade_zip()))
     assert not (tmp_path / "seasons" / "2012").exists()
     assert not (tmp_path / "seasons" / "2012.part").exists()

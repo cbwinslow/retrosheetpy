@@ -46,8 +46,8 @@ _WHOLE = {
 }
 
 _BOX_SINGLE_SEASONS = {1871, 1872, 1874}
-# Retrosheet's "1890sbox.zip" holds 1898-1899 only; "1900sbox.zip" holds 1900-1909.
-_BOX_ERA = {range(1898, 1900): "1890sbox.zip", range(1900, 1910): "1900sbox.zip"}
+# Checked against the real archives: "1890sbox.zip" holds 1897-1899, "1900sbox.zip" holds 1900-1909.
+_BOX_ERA = {range(1897, 1900): "1890sbox.zip", range(1900, 1910): "1900sbox.zip"}
 
 
 def _need_season(product: Product, season: int | None) -> int:

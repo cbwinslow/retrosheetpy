@@ -31,9 +31,11 @@ from retrosheetpy.errors import (
     IntegrityError,
     InvalidArchiveError,
     RetrosheetError,
+    SeasonNotFoundError,
     ToolError,
     UnsafeArchiveMemberError,
 )
+from retrosheetpy.kinds import Kind
 from retrosheetpy.options import Opts
 from retrosheetpy.table import BoxScores, Table
 
@@ -45,11 +47,13 @@ __all__ = [
     "Field",
     "IntegrityError",
     "InvalidArchiveError",
+    "Kind",
     "Opts",
     "Product",
     "Resource",
     "RetrosheetError",
     "Season",
+    "SeasonNotFoundError",
     "Table",
     "ToolError",
     "UnsafeArchiveMemberError",

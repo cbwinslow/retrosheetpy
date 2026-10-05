@@ -23,3 +23,7 @@ class ArchiveTooLargeError(InvalidArchiveError):
 
 class ToolError(RetrosheetError):
     """A chadwickpy tool run on a season exited with an error."""
+
+
+class SeasonNotFoundError(RetrosheetError):
+    """Retrosheet's archive has no files for the season (or kind) that was asked for."""

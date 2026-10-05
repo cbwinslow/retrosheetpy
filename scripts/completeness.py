@@ -15,6 +15,7 @@ from pathlib import PurePosixPath
 
 import retrosheetpy as rs
 from retrosheetpy.cache import _wanted
+from retrosheetpy.kinds import is_event_file, wanted
 
 
 def main() -> int:
@@ -33,7 +34,36 @@ def main() -> int:
         dropped = [n for n in names if n not in kept]
         ok &= not dropped
         print(f"{archive.name}: {len(names)} members, not kept: {dropped}")
-    print("every member of every archive is kept:", ok)
+    print("every member of every decade archive is kept:", ok)
+
+    # The other archives (postseason, All-Star, Negro Leagues, early box scores): each member must
+    # belong to a season that retrosheetpy keeps. Archives with no event files at all are reported.
+    other_ok = True
+    for product in (
+        "events_postseason",
+        "events_allstar",
+        "events_negro_league",
+        "box_negro_league",
+        "box_archive",
+    ):
+        for archive in sorted((rs.cache_dir() / "downloads" / product).glob("*.zip")):
+            names = [
+                PurePosixPath(n).name
+                for n in zipfile.ZipFile(archive).namelist()
+                if not n.endswith("/")
+            ]
+            years = {int(n[:4]) for n in names if n[:4].isdigit()}
+            kept = {n for y in years for n in names if wanted(y).match(n)}
+            dropped = [n for n in names if n not in kept and not n.upper().startswith("TEAM")]
+            other_ok &= not dropped
+            seasons = sorted({int(n[:4]) for n in names if is_event_file(n)})
+            span = f"{seasons[0]}-{seasons[-1]}" if seasons else "no event files"
+            print(
+                f"{archive.name}: {len(names)} members, seasons with games: {len(seasons)} "
+                f"({span}), not kept: {dropped}"
+            )
+    print("every member of every other archive is kept:", other_ok)
+    ok &= other_ok
 
     bad = 0
     for year in (int(a) for a in sys.argv[1:]):

@@ -108,7 +108,7 @@ def test_repeated_or_missing_years_are_refused(cache: Path) -> None:
 
 
 def test_a_season_with_no_data_in_the_archive_is_an_error(cache: Path) -> None:
-    with pytest.raises(rs.IntegrityError):
+    with pytest.raises(rs.SeasonNotFoundError):
         q("events", 2012, cache)
 
 

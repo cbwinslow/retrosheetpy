@@ -172,7 +172,10 @@ def test_get_list_cache(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
         rs.season(y, cache=c, fetch=fake.fetch)
     assert run(c, "get", "2010-2011") == 0
     out = capsys.readouterr().out
-    assert "2010: 2 event files (AAA, BBB)" in out and "2011: 1 event files (AAA)" in out
+    assert (
+        "regular 2010: 2 event files (AAA, BBB)" in out
+        and "regular 2011: 1 event files (AAA)" in out
+    )
     assert run(c, "list") == 0 and capsys.readouterr().out.split() == ["2010", "2011"]
     assert run(c, "cache", "path") == 0 and str(c) in capsys.readouterr().out
     assert run(c, "cache", "verify") == 0

@@ -11,9 +11,14 @@ import retrosheetpy as rs
 from retrosheetpy._meta import __version__
 from retrosheetpy.api import Years
 from retrosheetpy.errors import RetrosheetError
+from retrosheetpy.kinds import Kind
 from retrosheetpy.options import Opts
 from retrosheetpy.tools import TOOLS
 
+KIND_HELP = (
+    "which Retrosheet files: regular (default), postseason, allstar, negro, negro_box (games known "
+    "from box scores only), box (1897-1909 box-score-only games)"
+)
 TABLE_FORMATS = ("csv", "jsonl", "json", "sqlite")
 BOX_FORMATS = ("text", "xml", "sportsml")
 _EXT = {"csv": "csv", "jsonl": "jsonl", "json": "json", "sqlite": "sqlite", "text": "txt",
@@ -56,10 +61,12 @@ def _parser() -> argparse.ArgumentParser:
     g = sub.add_parser("get", help="download and unpack seasons into the cache")
     g.add_argument("years", nargs="+", metavar="YEARS", help="2010, 2000-2010, 2001,2005")
     g.add_argument("--force", action="store_true", help="download again even if cached")
+    g.add_argument("--kind", choices=[k.value for k in Kind], default="regular", help=KIND_HELP)
 
     for name, t in TOOLS.items():
         q = sub.add_parser(name, help=f"{t.command} over seasons (downloads them if needed)")
         q.add_argument("years", nargs="+", metavar="YEARS", help="2010, 2000-2010, 2001,2005")
+        q.add_argument("--kind", choices=[k.value for k in Kind], default="regular", help=KIND_HELP)
         q.add_argument("--home", help="only these home teams' files, e.g. NYA or NYA,BOS")
         q.add_argument("--game", help="only this game id, e.g. ANA201004050")
         q.add_argument("--start", help="earliest date, mmdd")
@@ -109,7 +116,7 @@ def _destination(args: argparse.Namespace, years: list[int]) -> Path | None:
 def _run_query(args: argparse.Namespace) -> int:
     years = parse_years(args.years)
     spec: Years = years
-    obj = getattr(rs, args.command)(spec, cache=args.cache_dir, **_opts(args))
+    obj = getattr(rs, args.command)(spec, kind=args.kind, cache=args.cache_dir, **_opts(args))
     dest = _destination(args, years)
     fmt = args.format
     if fmt == "sqlite":
@@ -149,8 +156,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "get":
             for y in parse_years(args.years):
-                s = rs.season(y, cache=args.cache_dir, force=args.force)
-                print(f"{y}: {len(s.event_files)} event files ({', '.join(s.teams)}) -> {s.folder}")
+                s = rs.season(y, kind=args.kind, cache=args.cache_dir, force=args.force)
+                teams = f" ({', '.join(s.teams)})" if s.teams else ""
+                print(f"{s.kind.value} {y}: {len(s.event_files)} event files{teams} -> {s.folder}")
         elif args.command in TOOLS:
             return _run_query(args)
         elif args.command == "fields":
@@ -158,8 +166,9 @@ def main(argv: list[str] | None = None) -> int:
                 kind = "x" if fld.extended else "f"
                 print(f"{kind}{fld.number:>3}  {fld.description}")
         elif args.command == "list":
-            for y in rs.cached_seasons(args.cache_dir):
-                print(y)
+            for kind in Kind:
+                for y in rs.cached_seasons(args.cache_dir, kind):
+                    print(y if kind is Kind.REGULAR else f"{kind.value} {y}")
         elif args.command == "cache":
             if args.action == "path":
                 print(rs.cache_dir(args.cache_dir))
