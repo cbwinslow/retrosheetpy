@@ -9,13 +9,18 @@ import json
 import os
 import re
 import shutil
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Unpack
 
 from retrosheetpy.catalog import Product, resolve
 from retrosheetpy.client import Client, Fetch, atomic_write, http_fetch, iter_zip_members
 from retrosheetpy.errors import IntegrityError
+from retrosheetpy.options import Options, Opts
+from retrosheetpy.table import BoxScores, Table
+from retrosheetpy.tools import tool
 
 HOME_ENV = "RETROSHEETPY_HOME"
 NOTICE = (
@@ -23,6 +28,13 @@ NOTICE = (
     "Retrosheet. Interested parties may contact Retrosheet at www.retrosheet.org."
 )
 _NOTICE_MARK = ".notice-shown"
+
+
+def print_notice(text: str) -> None:
+    """Show Retrosheet's data-use notice on stderr (once per cache, the first time we download)."""
+    print(text, file=sys.stderr)
+
+
 _RECORD = ".season.json"
 MAX_MEMBER_BYTES = 256 * 1024**2
 
@@ -38,17 +50,51 @@ def cache_dir(override: str | Path | None = None) -> Path:
 def _wanted(year: int) -> re.Pattern[str]:
     y = str(year)
     return re.compile(
-        rf"^(?:{y}[A-Z0-9]{{3}}\.EV[NA]|[A-Z0-9]{{3}}{y}\.ROS|TEAM{y})$", re.IGNORECASE
+        rf"^(?:{y}[A-Z0-9]{{3}}\.E[VD][A-Z]|[A-Z0-9]{{3}}{y}\.ROS|TEAM{y})$", re.IGNORECASE
     )
 
 
 @dataclass(frozen=True)
 class Season:
+    """One season unpacked in the cache: where its files are, and the tables you can ask for."""
+
     year: int
     folder: Path
     event_files: tuple[Path, ...]
     roster_files: tuple[Path, ...]
     team_file: Path | None
+
+    @property
+    def teams(self) -> tuple[str, ...]:
+        """Home-team codes with an event file this season (Retrosheet names files by home team)."""
+        return tuple(sorted({p.name[4:7].upper() for p in self.event_files}))
+
+    def events(self, **opts: Unpack[Opts]) -> Table:
+        """Every play: one row per event (Chadwick's cwevent)."""
+        return self._table("events", opts)
+
+    def games(self, **opts: Unpack[Opts]) -> Table:
+        """One row per game (cwgame)."""
+        return self._table("games", opts)
+
+    def daily(self, **opts: Unpack[Opts]) -> Table:
+        """One row per player per game (cwdaily)."""
+        return self._table("daily", opts)
+
+    def subs(self, **opts: Unpack[Opts]) -> Table:
+        """One row per substitution (cwsub)."""
+        return self._table("subs", opts)
+
+    def comments(self, **opts: Unpack[Opts]) -> Table:
+        """One row per comment record (cwcomment)."""
+        return self._table("comments", opts)
+
+    def boxscores(self, **opts: Unpack[Opts]) -> BoxScores:
+        """Box scores as text, XML or SportsML (cwbox)."""
+        return BoxScores(tool("boxscores"), [self], Options.build(tool("boxscores"), opts))
+
+    def _table(self, name: str, opts: Opts) -> Table:
+        return Table(tool(name), [self], Options.build(tool(name), opts))
 
 
 def season_folder(cache: Path, year: int) -> Path:
@@ -57,7 +103,7 @@ def season_folder(cache: Path, year: int) -> Path:
 
 def _scan(year: int, folder: Path) -> Season:
     files = sorted(p for p in folder.iterdir() if p.is_file() and _wanted(year).match(p.name))
-    ev = tuple(p for p in files if p.suffix.upper() in (".EVN", ".EVA"))
+    ev = tuple(p for p in files if p.suffix.upper() != ".ROS" and p.name.upper() != f"TEAM{year}")
     ros = tuple(p for p in files if p.suffix.upper() == ".ROS")
     team = next((p for p in files if p.name.upper() == f"TEAM{year}"), None)
     return Season(year, folder, ev, ros, team)
