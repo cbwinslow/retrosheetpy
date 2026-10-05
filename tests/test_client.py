@@ -1,4 +1,5 @@
 import io
+import urllib.request
 import zipfile
 from datetime import UTC
 
@@ -247,3 +248,12 @@ def test_reading_an_oversized_zip_from_disk_is_refused(tmp_path, monkeypatch):
 def test_http_fetch_refuses_non_https(url):
     with pytest.raises(ValueError, match="https"):
         http_fetch(url)
+
+
+def test_redirect_to_http_is_refused():
+    handler = client_module._HttpsOnly()
+    req = urllib.request.Request("https://www.retrosheet.org/x")
+    with pytest.raises(ValueError, match="non-https"):
+        handler.redirect_request(req, None, 302, "Found", {}, "http://evil.example/x")
+    ok = handler.redirect_request(req, None, 302, "Found", {}, "https://www.retrosheet.org/y")
+    assert ok is not None

@@ -33,12 +33,24 @@ MAX_MEMBERS = 20_000
 MAX_UNPACKED_BYTES = 4 * 1024**3
 
 
+class _HttpsOnly(urllib.request.HTTPRedirectHandler):
+    """Refuse a redirect to anything but https, so a downgrade to http: or ftp: cannot happen."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        if not newurl.startswith("https://"):
+            raise ValueError(f"refusing redirect to non-https URL: {newurl!r}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_HttpsOnly)
+
+
 def http_fetch(url: str) -> bytes:
     """GET ``url`` over https and return the body. Any other scheme (file:, ftp:) is refused."""
     if not url.startswith("https://"):
         raise ValueError(f"only https URLs are fetched: {url!r}")
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310 - https only, checked above
-    with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
+    with _OPENER.open(req, timeout=120) as resp:
         data: bytes = resp.read()
         return data
 
