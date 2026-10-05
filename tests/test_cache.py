@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from retrosheetpy import IntegrityError, Season, cache_dir, get
-from retrosheetpy import season as season_module
+from retrosheetpy import IntegrityError, Season, cache_dir
+from retrosheetpy import cache as season_module
+from retrosheetpy.cache import get
 from retrosheetpy.cli import main
 
 
@@ -132,3 +133,11 @@ def test_cli_list_path_and_verify(tmp_path: Path, capsys: pytest.CaptureFixture[
 def test_cli_get_reports_errors_plainly(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--cache-dir", str(tmp_path), "get", "1850"]) == 1
     assert "no event decade archive" in capsys.readouterr().err
+
+
+def test_every_kind_of_event_file_is_kept(tmp_path: Path) -> None:
+    """Retrosheet also has .EVF (Federal League), .EVR and .ED? (deduced games) files."""
+    extra = {name: b"x\n" for name in ("2010FED.EVF", "2010REG.EVR", "2010DED.EDN", "2010DEE.EDA")}
+    s = get(2010, cache=tmp_path, fetch=Fetch(decade_zip(extra)))
+    names = {p.name for p in s.event_files}
+    assert {"2010FED.EVF", "2010REG.EVR", "2010DED.EDN", "2010DEE.EDA"} <= names
