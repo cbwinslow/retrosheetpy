@@ -353,6 +353,16 @@ def _processes_running_in(folder: Path) -> list[int]:
     return found
 
 
+def _describe(pid: int) -> str:
+    """State, parent, process group and session of a process, for a failure message."""
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode()[:70]
+        return f"pid {pid} state={fields[0]} ppid={fields[1]} pgrp={fields[2]} session={fields[3]} {cmd}"
+    except OSError:
+        return f"pid {pid} (gone)"
+
+
 def _wait_until_none_left(folder: Path, seconds: float = 10) -> list[int]:
     import time
 
@@ -388,7 +398,10 @@ def test_stopping_early_leaves_no_worker_processes_behind(cache: Path) -> None:
     folder = cache / "seasons" / "2010"
     assert _processes_running_in(folder), "the tool should be running right now"
     it.close()
-    assert _wait_until_none_left(folder) == [], "worker processes were left running"
+    left = _wait_until_none_left(folder)
+    assert left == [], "worker processes were left running: " + "; ".join(
+        _describe(pid) for pid in left
+    )
 
 
 @needs_proc
