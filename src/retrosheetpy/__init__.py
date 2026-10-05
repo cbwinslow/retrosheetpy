@@ -11,6 +11,7 @@ from retrosheetpy.errors import (
     RetrosheetError,
     UnsafeArchiveMemberError,
 )
+from retrosheetpy.season import Season, cache_dir, get
 
 __all__ = [
     "ArchiveTooLargeError",
@@ -21,8 +22,11 @@ __all__ = [
     "Product",
     "Resource",
     "RetrosheetError",
+    "Season",
     "UnsafeArchiveMemberError",
     "__version__",
+    "cache_dir",
+    "get",
     "http_fetch",
     "iter_zip_members",
     "resolve",
