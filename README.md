@@ -48,10 +48,39 @@ Regular-season games from Retrosheet's decade event archives, seasons **1908 to 
 team files (`2010ANA.EVA`, the Federal League's `.EVF`, `.EVR`) and the deduced-game files
 (`.EDN`, `.EDA`, `.EDF`, including those named by year alone, such as `1920.EDA`).
 
-Not included yet: postseason, all-star and Negro Leagues event files (separate archives), games
-Retrosheet has only as box scores, and seasons before 1908. So game counts can be lower than
-Retrosheet's own per-season CSV: for 2010 it lists 2,463 games and this package gives 2,430, and the
-difference is exactly the 32 postseason and 1 all-star game.
+Games from Retrosheet's other archives are one option away, with `kind=` (or `--kind`):
+
+| `kind=` | Retrosheet files | Seasons | Notes |
+| --- | --- | --- | --- |
+| `"regular"` (default) | decade event archives | 1908 on | |
+| `"postseason"` | `allpost.zip` | 1900 on | World Series, playoffs, division series |
+| `"allstar"` | `allas.zip` | 1933 on | |
+| `"negro"` | `allevr.zip` | 1903 to 1961 | Negro Leagues play-by-play |
+| `"negro_box"` | `allebr.zip` | 1903 to 1961 | games known from box scores only: no events |
+| `"box"` | `1890sbox.zip`, `1900sbox.zip` | 1897 to 1909 | major-league games known from box scores only: no events |
+
+Each kind is kept apart in the cache (a season's postseason and regular files have different team
+lists). `home=` works on the regular season only, since the other files are not named by home team.
+Retrosheet ships no team list for the Negro Leagues archives and the Chadwick tools will not run
+without one, so retrosheetpy creates an empty one. Games known only from box scores have no plays, so
+`events` is empty for them; `games`, `daily` and `boxscores` have the data.
+
+Checked against the real C tools (6,000-odd comparisons): every season of `postseason`, `allstar`,
+`negro` and `box` 1897-1899, all six tables, byte-identical.
+
+**Known problems in Retrosheet's box-score-only files, not in this package.** The C tools themselves
+fail on these, and chadwickpy stops where the C would crash or read uninitialised memory, so you get
+an error (`ToolError`) instead of output:
+
+* `boxscores` for `kind="box"` 1901 to 1907: the C `cwbox` crashes on these files. Single games work
+  (`game=`).
+* `kind="negro_box"` 1921, 1933 to 1939, 1946, 1947 and 1949: some games are damaged (players listed
+  in a statistics line but missing from the lineup, `NA` where a number belongs, a start time written
+  as `6.25E-2`). `games`, `daily` and `boxscores` fail for those seasons; asking for one game or a date
+  range that avoids the damaged games works.
+
+The 1871, 1872 and 1874 archives Retrosheet lists as box scores hold only a team list, so there is
+nothing to read; the package says so. Seasons before 1897 are not available from these archives.
 
 ## Options (the same for every table)
 
