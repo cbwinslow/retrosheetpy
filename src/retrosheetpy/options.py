@@ -14,7 +14,9 @@ class Opts(TypedDict, total=False):
     """Keyword options accepted by ``events``, ``games``, ``daily``, ``subs``, ``comments`` and
     ``boxscores`` (everywhere in the API and as flags on the command line)."""
 
-    home: str | Iterable[str]  # only these home teams' files (e.g. "NYA" or ["NYA", "BOS"])
+    # only these home teams' files (e.g. "NYA" or ["NYA", "BOS"]). Games Retrosheet deduced from
+    # box scores sit in files named by year (1920.EDA) that mix teams; home= leaves those out.
+    home: str | Iterable[str]
     game: str  # only this game id (Chadwick -i)
     start: str  # earliest date to process, "mmdd" (Chadwick -s)
     end: str  # latest date to process, "mmdd" (Chadwick -e)

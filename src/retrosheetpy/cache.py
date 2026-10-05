@@ -18,6 +18,7 @@ from typing import Unpack
 from retrosheetpy.catalog import Product, resolve
 from retrosheetpy.client import Client, Fetch, atomic_write, http_fetch, iter_zip_members
 from retrosheetpy.errors import IntegrityError
+from retrosheetpy.names import home_team
 from retrosheetpy.options import Options, Opts
 from retrosheetpy.table import BoxScores, Table
 from retrosheetpy.tools import tool
@@ -36,6 +37,7 @@ def print_notice(text: str) -> None:
 
 
 _RECORD = ".season.json"
+LAYOUT = 2  # bump when the set of files kept from an archive changes; old unpacks are redone
 MAX_MEMBER_BYTES = 256 * 1024**2
 
 
@@ -48,9 +50,12 @@ def cache_dir(override: str | Path | None = None) -> Path:
 
 
 def _wanted(year: int) -> re.Pattern[str]:
+    """The files of one season in a decade archive: team event files (``2010ANA.EVA``), the
+    deduced-game files named by year alone (``1920.EDA``), rosters and the team list."""
     y = str(year)
     return re.compile(
-        rf"^(?:{y}[A-Z0-9]{{3}}\.E[VD][A-Z]|[A-Z0-9]{{3}}{y}\.ROS|TEAM{y})$", re.IGNORECASE
+        rf"^(?:{y}[A-Z0-9]{{3}}\.E[VD][A-Z]|{y}\.E[VD][A-Z]|[A-Z0-9]{{3}}{y}\.ROS|TEAM{y})$",
+        re.IGNORECASE,
     )
 
 
@@ -65,9 +70,15 @@ class Season:
     team_file: Path | None
 
     @property
+    def team_event_files(self) -> tuple[Path, ...]:
+        """The event files named by home team. The rest (``1920.EDA``) hold deduced games of many
+        teams together, so they belong to no single team."""
+        return tuple(p for p in self.event_files if home_team(p.name))
+
+    @property
     def teams(self) -> tuple[str, ...]:
         """Home-team codes with an event file this season (Retrosheet names files by home team)."""
-        return tuple(sorted({p.name[4:7].upper() for p in self.event_files}))
+        return tuple(sorted({t for p in self.event_files if (t := home_team(p.name))}))
 
     def events(self, **opts: Unpack[Opts]) -> Table:
         """Every play: one row per event (Chadwick's cwevent)."""
@@ -124,11 +135,17 @@ def _unpack(year: int, zip_path: Path, folder: Path, sha256: str) -> None:
             data = stream.read(MAX_MEMBER_BYTES + 1)
             if len(data) > MAX_MEMBER_BYTES:
                 raise IntegrityError(f"{zip_path}:{name} is larger than {MAX_MEMBER_BYTES} bytes")
-            atomic_write(tmp / base, data)
+            # No per-file fsync: the unpacked folder can always be rebuilt from the saved zip, and
+            # flushing ~600 small files one by one is very slow on a busy disk. The folder only
+            # appears under its real name (rename) after every file is written.
+            (tmp / base).write_bytes(data)
             found += 1
         if not found:
             raise IntegrityError(f"{zip_path} holds no files for {year}")
-        atomic_write(tmp / _RECORD, json.dumps({"year": year, "zip_sha256": sha256}).encode())
+        atomic_write(
+            tmp / _RECORD,
+            json.dumps({"year": year, "zip_sha256": sha256, "layout": LAYOUT}).encode(),
+        )
         shutil.rmtree(folder, ignore_errors=True)
         tmp.replace(folder)
     except BaseException:
@@ -141,7 +158,9 @@ def _unpacked_ok(year: int, folder: Path, sha256: str) -> bool:
         rec = json.loads((folder / _RECORD).read_text())
     except (OSError, ValueError):
         return False
-    return bool(rec.get("year") == year and rec.get("zip_sha256") == sha256)
+    return bool(
+        rec.get("year") == year and rec.get("zip_sha256") == sha256 and rec.get("layout") == LAYOUT
+    )
 
 
 def get(

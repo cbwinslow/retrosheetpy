@@ -141,3 +141,35 @@ def test_every_kind_of_event_file_is_kept(tmp_path: Path) -> None:
     s = get(2010, cache=tmp_path, fetch=Fetch(decade_zip(extra)))
     names = {p.name for p in s.event_files}
     assert {"2010FED.EVF", "2010REG.EVR", "2010DED.EDN", "2010DEE.EDA"} <= names
+
+
+def test_year_named_deduced_game_files_are_kept(tmp_path: Path) -> None:
+    """Retrosheet also ships deduced games in files named by year only (1920.EDA, 1920.EDN)."""
+    extra = {"2010.EDA": b"x\n", "2010.EDN": b"x\n", "2011.EDA": b"other season\n"}
+    s = get(2010, cache=tmp_path, fetch=Fetch(decade_zip(extra)))
+    names = {p.name for p in s.event_files}
+    assert {"2010.EDA", "2010.EDN"} <= names and "2011.EDA" not in names
+    assert "2010.EDA" not in {p.name for p in s.team_event_files}
+
+
+def test_teams_and_home_filter_ignore_year_named_files(tmp_path: Path) -> None:
+    extra = {"2010.EDA": b"x\n"}
+    s = get(2010, cache=tmp_path, fetch=Fetch(decade_zip(extra)))
+    assert s.teams == ("ANA", "BOS")  # no junk code made from "2010.EDA"
+
+
+def test_a_season_unpacked_by_an_older_version_is_unpacked_again(tmp_path: Path) -> None:
+    """The older filter dropped the year-named files; the cache must not keep that folder."""
+    import json
+
+    extra = {"2010.EDA": b"x\n"}
+    fetch = Fetch(decade_zip(extra))
+    s = get(2010, cache=tmp_path, fetch=fetch)
+    (s.folder / "2010.EDA").unlink()  # what an old unpack looked like
+    rec = s.folder / ".season.json"
+    data = json.loads(rec.read_text())
+    del data["layout"]
+    rec.write_text(json.dumps(data))
+    again = get(2010, cache=tmp_path, fetch=fetch)
+    assert "2010.EDA" in {p.name for p in again.event_files}
+    assert len(fetch.calls) == 1  # re-unpacked from the saved zip, not downloaded again
