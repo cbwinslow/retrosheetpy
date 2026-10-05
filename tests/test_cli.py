@@ -210,3 +210,20 @@ def test_a_flag_a_table_does_not_have_is_a_usage_error(cache: Path) -> None:
     with pytest.raises(SystemExit) as exc:
         run(cache, "daily", "2010", "--extended", "0")
     assert exc.value.code == 2
+
+
+def test_a_closed_pipe_is_silent_for_real(cache: Path) -> None:
+    """`retrosheetpy events 2010 | head` must end quietly: no traceback, exit status 0."""
+    import subprocess
+    import sys
+
+    proc = subprocess.Popen(  # noqa: S603
+        [sys.executable, "-m", "retrosheetpy.cli", "--cache-dir", str(cache), "events", "2010"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert proc.stdout is not None
+    proc.stdout.close()  # the reader goes away before the first byte is written
+    _, err = proc.communicate(timeout=60)
+    assert proc.returncode == 0
+    assert err == b""

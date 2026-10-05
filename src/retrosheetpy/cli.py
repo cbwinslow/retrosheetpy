@@ -1,7 +1,9 @@
 """Command-line entry point. Parses arguments and calls the API; no logic of its own."""
 
 import argparse
+import contextlib
 import io
+import os
 import sys
 from pathlib import Path
 
@@ -131,6 +133,13 @@ def _run_query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _silence_stdout() -> None:
+    """Point stdout at /dev/null so Python's exit-time flush does not report the broken pipe again
+    (the recipe from the Python docs for `| head`)."""
+    with contextlib.suppress(OSError, ValueError, AttributeError):  # stdout may not be a real file
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -165,6 +174,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.print_usage(sys.stderr)
             return 2
     except BrokenPipeError:
+        if argv is None:  # run as a program, not called from Python: stdout is ours to redirect
+            _silence_stdout()
         return 0  # the reader (e.g. `| head`) closed the pipe; that is not an error
     except (RetrosheetError, ValueError, OSError, TypeError) as exc:
         print(f"retrosheetpy: {exc}", file=sys.stderr)

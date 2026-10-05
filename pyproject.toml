@@ -23,6 +23,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+pandas = ["pandas"]  # for Table.to_pandas()
+
 [project.urls]
 Homepage = "https://github.com/cbwinslow/retrosheetpy"
 Source = "https://github.com/cbwinslow/retrosheetpy"
