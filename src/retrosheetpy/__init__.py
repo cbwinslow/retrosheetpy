@@ -9,9 +9,11 @@ from retrosheetpy.errors import (
     IntegrityError,
     InvalidArchiveError,
     RetrosheetError,
+    ToolError,
     UnsafeArchiveMemberError,
 )
 from retrosheetpy.season import Season, cache_dir, get
+from retrosheetpy.tables import boxscores, comments, daily, events, games, subs
 
 __all__ = [
     "ArchiveTooLargeError",
@@ -23,11 +25,18 @@ __all__ = [
     "Resource",
     "RetrosheetError",
     "Season",
+    "ToolError",
     "UnsafeArchiveMemberError",
     "__version__",
+    "boxscores",
     "cache_dir",
+    "comments",
+    "daily",
+    "events",
+    "games",
     "get",
     "http_fetch",
     "iter_zip_members",
     "resolve",
+    "subs",
 ]
