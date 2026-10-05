@@ -1,0 +1,15 @@
+name: Data problem
+description: A season downloaded or converted wrongly (missing file, bad checksum, odd rows).
+labels: [bug]
+body:
+  - type: input
+    id: season
+    attributes:
+      label: Season and command
+      placeholder: "retrosheetpy events 2010"
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes:
+      label: What looks wrong?
+    validations: { required: true }

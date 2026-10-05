@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uvx ruff check .
+      - run: uvx ruff format --check .
+      - run: uvx mypy --strict src
+
+  tests:
+    name: tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # hatch-vcs reads the version from git tags
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv run --with pytest pytest -q -rs -p no:cacheprovider
+
+  package:
+    name: build and clean-install check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - name: Install the wheel in a clean venv and run the command
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/clean/bin/retrosheetpy --version
+          /tmp/clean/bin/python -c "import retrosheetpy; print(retrosheetpy.__version__)"
+      - run: uvx twine check dist/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+
+  # Branch protection requires this one check name.
+  test:
+    name: test
+    needs: [lint, tests, package]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to have succeeded
+        run: |
+          [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.tests.result }}" = success ] \
+            && [ "${{ needs.package.result }}" = success ] || { echo "a job failed"; exit 1; }
