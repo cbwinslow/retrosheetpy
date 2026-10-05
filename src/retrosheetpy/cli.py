@@ -2,7 +2,7 @@
 
 import sys
 
-from retrosheetpy import __version__
+from retrosheetpy._meta import __version__
 
 
 def main(argv: list[str] | None = None) -> int:

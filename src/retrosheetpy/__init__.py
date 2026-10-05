@@ -1,8 +1,27 @@
 """Download Retrosheet seasons, cache them, and turn them into data tables."""
 
-from importlib.metadata import PackageNotFoundError, version
+from retrosheetpy._meta import __version__
+from retrosheetpy.artifact import Artifact
+from retrosheetpy.catalog import Product, Resource, resolve
+from retrosheetpy.client import Client, http_fetch, iter_zip_members
+from retrosheetpy.errors import (
+    IntegrityError,
+    InvalidArchiveError,
+    RetrosheetError,
+    UnsafeArchiveMemberError,
+)
 
-try:
-    __version__ = version("retrosheetpy")
-except PackageNotFoundError:  # running from a source tree that is not installed
-    __version__ = "0.0.0"
+__all__ = [
+    "Artifact",
+    "Client",
+    "IntegrityError",
+    "InvalidArchiveError",
+    "Product",
+    "Resource",
+    "RetrosheetError",
+    "UnsafeArchiveMemberError",
+    "__version__",
+    "http_fetch",
+    "iter_zip_members",
+    "resolve",
+]
