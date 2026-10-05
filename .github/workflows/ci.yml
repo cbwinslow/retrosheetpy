@@ -30,7 +30,7 @@ jobs:
           enable-cache: true
       - run: uvx ruff check .
       - run: uvx ruff format --check .
-      - run: uvx mypy --strict src
+      - run: uv run mypy --strict src # in the project environment, so chadwickpy is importable
 
   tests:
     name: tests (py${{ matrix.python }})
