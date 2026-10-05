@@ -15,3 +15,7 @@ class InvalidArchiveError(RetrosheetError):
 
 class UnsafeArchiveMemberError(RetrosheetError):
     """A zip member name would escape the archive (absolute path or '..')."""
+
+
+class ArchiveTooLargeError(InvalidArchiveError):
+    """A zip holds more members or more data than any Retrosheet archive should (zip-bomb guard)."""

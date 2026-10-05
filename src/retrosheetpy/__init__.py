@@ -5,6 +5,7 @@ from retrosheetpy.artifact import Artifact
 from retrosheetpy.catalog import Product, Resource, resolve
 from retrosheetpy.client import Client, http_fetch, iter_zip_members
 from retrosheetpy.errors import (
+    ArchiveTooLargeError,
     IntegrityError,
     InvalidArchiveError,
     RetrosheetError,
@@ -12,6 +13,7 @@ from retrosheetpy.errors import (
 )
 
 __all__ = [
+    "ArchiveTooLargeError",
     "Artifact",
     "Client",
     "IntegrityError",

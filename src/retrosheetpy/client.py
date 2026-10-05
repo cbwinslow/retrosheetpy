@@ -16,16 +16,29 @@ from typing import IO, Any
 from retrosheetpy._meta import __version__
 from retrosheetpy.artifact import Artifact
 from retrosheetpy.catalog import Resource
-from retrosheetpy.errors import IntegrityError, InvalidArchiveError, UnsafeArchiveMemberError
+from retrosheetpy.errors import (
+    ArchiveTooLargeError,
+    IntegrityError,
+    InvalidArchiveError,
+    UnsafeArchiveMemberError,
+)
 
 USER_AGENT = f"retrosheetpy/{__version__} (+https://github.com/cbwinslow/retrosheetpy)"
 
 Fetch = Callable[[str], bytes]
 
+# Zip-bomb guard. Retrosheet's biggest archives are ~25 MB zipped (a few hundred MB unpacked), so
+# these ceilings are far above real use but stop a hostile archive that claims terabytes.
+MAX_MEMBERS = 20_000
+MAX_UNPACKED_BYTES = 4 * 1024**3
+
 
 def http_fetch(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 - fixed https URLs
+    """GET ``url`` over https and return the body. Any other scheme (file:, ftp:) is refused."""
+    if not url.startswith("https://"):
+        raise ValueError(f"only https URLs are fetched: {url!r}")
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310 - https only, checked above
+    with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
         data: bytes = resp.read()
         return data
 
@@ -118,7 +131,9 @@ def _check_zip_payload(payload: bytes, url: str) -> None:
     """Raise unless ``payload`` is a complete, readable, safely-named zip."""
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as zf:
-            for info in zf.infolist():
+            infos = zf.infolist()
+            _check_size(infos, url)
+            for info in infos:
                 _check_member(info.filename)
             if zf.testzip() is not None:
                 raise InvalidArchiveError(f"{url}: archive has a corrupt member")
@@ -134,11 +149,20 @@ def _atomic_write(path: Path, payload: bytes) -> None:
             f.write(payload)
             f.flush()
             os.fsync(f.fileno())
-        os.chmod(tmp_name, 0o644)  # mkstemp creates 0600; cache files are ordinary data
-        os.replace(tmp_name, path)
+        tmp = Path(tmp_name)
+        tmp.chmod(0o644)  # mkstemp creates 0600; cache files are ordinary data
+        tmp.replace(path)
     except BaseException:
         Path(tmp_name).unlink(missing_ok=True)
         raise
+
+
+def _check_size(infos: list[zipfile.ZipInfo], where: str) -> None:
+    """Raise unless the archive's declared member count and total size are within the ceilings."""
+    if len(infos) > MAX_MEMBERS:
+        raise ArchiveTooLargeError(f"{where}: {len(infos)} members (limit {MAX_MEMBERS})")
+    if sum(i.file_size for i in infos) > MAX_UNPACKED_BYTES:
+        raise ArchiveTooLargeError(f"{where}: unpacks to more than {MAX_UNPACKED_BYTES} bytes")
 
 
 def _check_member(name: str) -> None:
@@ -187,9 +211,11 @@ def iter_zip_members(path: str | Path) -> Iterator[tuple[str, IO[bytes]]]:
     except zipfile.BadZipFile as exc:
         raise InvalidArchiveError(f"{path} is not a valid zip archive") from exc
     with zf:
-        for info in zf.infolist():
+        infos = zf.infolist()
+        _check_size(infos, str(path))
+        for info in infos:
             _check_member(info.filename)
-        for info in zf.infolist():
+        for info in infos:
             if info.is_dir():
                 continue
             try:
