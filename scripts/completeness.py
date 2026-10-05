@@ -8,11 +8,10 @@ one belongs to a season we keep, then checks that ``games`` has exactly as many 
 ``id,`` records in that season's raw event files. Run ``retrosheetpy get`` first for the seasons.
 """
 
-import glob
 import re
 import sys
 import zipfile
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 import retrosheetpy as rs
 from retrosheetpy.cache import _wanted
@@ -21,19 +20,19 @@ from retrosheetpy.cache import _wanted
 def main() -> int:
     root = rs.cache_dir() / "downloads" / "events_decade"
     ok = True
-    for archive in sorted(glob.glob(str(root / "*.zip"))):
+    for archive in sorted(root.glob("*.zip")):
         names = [
             PurePosixPath(n).name
             for n in zipfile.ZipFile(archive).namelist()
             if not n.endswith("/")
         ]
-        decade = int(Path(archive).name[:4])
+        decade = int(archive.name[:4])
         kept: set[str] = set()
         for year in range(1908 if decade == 1910 else decade, decade + 10):
             kept |= {n for n in names if _wanted(year).match(n)}
         dropped = [n for n in names if n not in kept]
         ok &= not dropped
-        print(f"{Path(archive).name}: {len(names)} members, not kept: {dropped}")
+        print(f"{archive.name}: {len(names)} members, not kept: {dropped}")
     print("every member of every archive is kept:", ok)
 
     bad = 0
