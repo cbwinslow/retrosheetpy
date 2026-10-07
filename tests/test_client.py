@@ -1,15 +1,18 @@
 import io
+import urllib.request
 import zipfile
 from datetime import UTC
 
 import pytest
 
 from retrosheetpy import (
+    ArchiveTooLargeError,
     Client,
     IntegrityError,
     InvalidArchiveError,
     Product,
     UnsafeArchiveMemberError,
+    http_fetch,
     iter_zip_members,
     resolve,
 )
@@ -217,3 +220,40 @@ def test_encrypted_member_is_invalid_archive_error(tmp_path, monkeypatch):
     monkeypatch.setattr(zf_mod.ZipFile, "testzip", boom)
     with pytest.raises(InvalidArchiveError):
         Client(tmp_path, fetch=FakeFetch(make_zip({"x": b"1"}))).download(RES)
+
+
+def test_archive_with_too_many_members_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(client_module, "MAX_MEMBERS", 2)
+    client = Client(tmp_path, fetch=FakeFetch(make_zip({"a": b"1", "b": b"1", "c": b"1"})))
+    with pytest.raises(ArchiveTooLargeError):
+        client.download(RES)
+
+
+def test_archive_that_unpacks_too_large_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(client_module, "MAX_UNPACKED_BYTES", 10)
+    client = Client(tmp_path, fetch=FakeFetch(make_zip({"a": b"x" * 11})))
+    with pytest.raises(ArchiveTooLargeError):
+        client.download(RES)
+
+
+def test_reading_an_oversized_zip_from_disk_is_refused(tmp_path, monkeypatch):
+    path = tmp_path / "z.zip"
+    path.write_bytes(make_zip({"a": b"x" * 11}))
+    monkeypatch.setattr(client_module, "MAX_UNPACKED_BYTES", 10)
+    with pytest.raises(ArchiveTooLargeError):
+        list(iter_zip_members(path))
+
+
+@pytest.mark.parametrize("url", ["file:///etc/passwd", "http://www.retrosheet.org/x", "ftp://x/y"])
+def test_http_fetch_refuses_non_https(url):
+    with pytest.raises(ValueError, match="https"):
+        http_fetch(url)
+
+
+def test_redirect_to_http_is_refused():
+    handler = client_module._HttpsOnly()
+    req = urllib.request.Request("https://www.retrosheet.org/x")
+    with pytest.raises(ValueError, match="non-https"):
+        handler.redirect_request(req, None, 302, "Found", {}, "http://evil.example/x")
+    ok = handler.redirect_request(req, None, 302, "Found", {}, "https://www.retrosheet.org/y")
+    assert ok is not None
