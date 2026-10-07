@@ -73,6 +73,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("years", nargs="+", type=int)
     ap.add_argument("--c-bin", type=Path, required=True, help="folder holding cwevent, cwgame, ...")
+    ap.add_argument(
+        "--kind", default="regular", help="regular, postseason, allstar, negro, negro_box, box"
+    )
     ap.add_argument("--cache-dir")
     ap.add_argument("--jobs", type=int, help="workers for retrosheetpy (default: automatic)")
     args = ap.parse_args()
@@ -80,8 +83,10 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         mine, theirs = Path(tmp) / "mine", Path(tmp) / "c"
         for year in args.years:
-            s = rs.season(year, cache=args.cache_dir)
-            cases: list[tuple[str, Opts]] = [(name, {}) for name in TOOLS] + _variants(s)
+            s = rs.season(year, kind=args.kind, cache=args.cache_dir)
+            cases: list[tuple[str, Opts]] = [(name, {}) for name in TOOLS]
+            if args.kind == "regular":  # the option variants pick files by home team
+                cases += _variants(s)
             for name, raw in cases:
                 tool = TOOLS[name]
                 opts = Options.build(tool, {**raw, **({"jobs": args.jobs} if args.jobs else {})})
@@ -121,10 +126,10 @@ def _check_combined(args: argparse.Namespace, tmp: str) -> int:
     bad = 0
     for name in ("games", "events"):
         tool = TOOLS[name]
-        table = getattr(rs, name)(args.years, cache=args.cache_dir)
+        table = getattr(rs, name)(args.years, kind=args.kind, cache=args.cache_dir)
         joined = bytearray()
         for i, year in enumerate(args.years):
-            s = rs.season(year, cache=args.cache_dir)
+            s = rs.season(year, kind=args.kind, cache=args.cache_dir)
             o = Options()
             out = subprocess.run(  # noqa: S603
                 _c_command(Path(args.c_bin), tool, year, o, runner.files_for(s, o)),

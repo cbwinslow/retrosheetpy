@@ -16,6 +16,7 @@ from retrosheetpy.cache import Season, print_notice
 from retrosheetpy.cache import get as get_season
 from retrosheetpy.client import Fetch, http_fetch
 from retrosheetpy.errors import ToolError
+from retrosheetpy.kinds import Kind
 from retrosheetpy.options import Options, Opts
 from retrosheetpy.table import BoxScores, Table
 from retrosheetpy.tools import TOOLS, tool
@@ -32,74 +33,88 @@ def _years(years: Years) -> list[int]:
     return listed
 
 
-def _seasons(years: Years, cache: str | Path | None, fetch: Fetch) -> list[Season]:
-    return [get_season(y, cache=cache, fetch=fetch, notice=print_notice) for y in _years(years)]
+def _seasons(
+    years: Years, cache: str | Path | None, fetch: Fetch, kind: Kind | str
+) -> list[Season]:
+    kind = Kind.parse(kind)
+    return [
+        get_season(y, kind=kind, cache=cache, fetch=fetch, notice=print_notice)
+        for y in _years(years)
+    ]
 
 
-def _table(name: str, years: Years, cache: str | Path | None, fetch: Fetch, opts: Opts) -> Table:
+def _table(
+    name: str, years: Years, cache: str | Path | None, fetch: Fetch, kind: Kind | str, opts: Opts
+) -> Table:
     t = tool(name)
     options = Options.build(t, opts)  # check the options before downloading anything
-    return Table(t, _seasons(years, cache, fetch), options)
+    return Table(t, _seasons(years, cache, fetch, kind), options)
 
 
 def events(
     years: Years,
     *,
+    kind: Kind | str = Kind.REGULAR,
     cache: str | Path | None = None,
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
 ) -> Table:
     """Every play: one row per event (Chadwick's cwevent), 164 columns."""
-    return _table("events", years, cache, fetch, opts)
+    return _table("events", years, cache, fetch, kind, opts)
 
 
 def games(
     years: Years,
     *,
+    kind: Kind | str = Kind.REGULAR,
     cache: str | Path | None = None,
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
 ) -> Table:
     """One row per game (cwgame), 182 columns."""
-    return _table("games", years, cache, fetch, opts)
+    return _table("games", years, cache, fetch, kind, opts)
 
 
 def daily(
     years: Years,
     *,
+    kind: Kind | str = Kind.REGULAR,
     cache: str | Path | None = None,
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
 ) -> Table:
     """One row per player per game (cwdaily), 154 columns."""
-    return _table("daily", years, cache, fetch, opts)
+    return _table("daily", years, cache, fetch, kind, opts)
 
 
 def subs(
     years: Years,
     *,
+    kind: Kind | str = Kind.REGULAR,
     cache: str | Path | None = None,
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
 ) -> Table:
     """One row per substitution (cwsub)."""
-    return _table("subs", years, cache, fetch, opts)
+    return _table("subs", years, cache, fetch, kind, opts)
 
 
 def comments(
     years: Years,
     *,
+    kind: Kind | str = Kind.REGULAR,
     cache: str | Path | None = None,
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
 ) -> Table:
     """One row per comment record (cwcomment)."""
-    return _table("comments", years, cache, fetch, opts)
+    return _table("comments", years, cache, fetch, kind, opts)
 
 
 def boxscores(
     years: Years,
     *,
+    kind: Kind | str = Kind.REGULAR,
     cache: str | Path | None = None,
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
@@ -107,14 +122,23 @@ def boxscores(
     """Box scores (cwbox) as text, XML or SportsML."""
     t = tool("boxscores")
     options = Options.build(t, opts)
-    return BoxScores(t, _seasons(years, cache, fetch), options)
+    return BoxScores(t, _seasons(years, cache, fetch, kind), options)
 
 
 def season(
-    year: int, *, cache: str | Path | None = None, fetch: Fetch = http_fetch, force: bool = False
+    year: int,
+    *,
+    kind: Kind | str = Kind.REGULAR,
+    cache: str | Path | None = None,
+    fetch: Fetch = http_fetch,
+    force: bool = False,
 ) -> Season:
-    """Download (if needed) and unpack one season; returns the :class:`Season` to ask tables of."""
-    return get_season(year, cache=cache, fetch=fetch, force=force, notice=print_notice)
+    """Download (if needed) and unpack one season; returns the :class:`Season` to ask tables of.
+
+    ``kind`` picks the Retrosheet files: ``"regular"`` (default), ``"postseason"``, ``"allstar"``,
+    ``"negro"`` (Negro Leagues play-by-play), ``"negro_box"`` and ``"box"`` (games known only from
+    box scores)."""
+    return get_season(year, kind=kind, cache=cache, fetch=fetch, force=force, notice=print_notice)
 
 
 @dataclass(frozen=True)

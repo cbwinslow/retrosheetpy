@@ -51,6 +51,11 @@ def _fields(spec: str | None, chose: bool, highest: int) -> str:
 
 def files_for(season: "Season", opts: Options) -> list[str]:
     """The season's event file names, narrowed to the requested home teams (in the given order)."""
+    if opts.home and season.kind.value != "regular":
+        raise ValueError(
+            "home= only works on regular-season files (they are named by home team); "
+            f"{season.kind.value} files are not"
+        )
     if not opts.home:
         return [p.name for p in season.event_files]
     # With home= only the files named by home team are read. The year-named deduced-game files

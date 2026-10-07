@@ -116,3 +116,31 @@ def test_rows_equal_the_c_output_parsed(tmp_path: Path) -> None:
     ).stdout.decode("latin-1")
     parsed = list(csv.DictReader(io.StringIO(theirs, newline="")))
     assert rs.games(2010, cache=tmp_path, fetch=fake.fetch).load() == parsed
+
+
+KINDS = [
+    ("postseason", 2010),
+    ("allstar", 2010),
+    ("negro", 1912),
+    ("negro_box", 1912),
+    ("box", 1901),
+]
+
+
+@pytest.mark.parametrize(("kind", "year"), KINDS)
+@pytest.mark.parametrize("name", list(TOOLS))
+def test_every_kind_equals_the_c_tool(tmp_path: Path, kind: str, year: int, name: str) -> None:
+    """Postseason, All-Star, Negro Leagues and box-score-only files: same bytes as the C tools."""
+    tool = TOOLS[name]
+    season = rs.season(year, kind=kind, cache=tmp_path, fetch=fake.fetch_any)
+    options = Options()
+    mine = io.BytesIO()
+    runner.run(tool, season, mine, options)
+    theirs = subprocess.run(  # noqa: S603
+        c_command(tool, year, options, runner.files_for(season, options)),
+        cwd=season.folder,
+        capture_output=True,
+        check=True,
+    )
+    assert mine.getvalue() == theirs.stdout
+    assert mine.getvalue()
