@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/cbwinslow/retrosheetpy/compare/v1.0.0...v1.0.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* zip size and member caps, https-only fetch, stricter lint rules ([#5](https://github.com/cbwinslow/retrosheetpy/issues/5)) ([eafa30f](https://github.com/cbwinslow/retrosheetpy/commit/eafa30f761f6f568200882925c6cbed3372d6a0f))
+
 ## 1.0.0 (2026-10-05)
 
 
