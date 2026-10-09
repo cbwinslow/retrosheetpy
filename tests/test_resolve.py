@@ -26,9 +26,17 @@ def test_event_decade(year, name):
     assert r.group == name.removesuffix(".zip")
 
 
-def test_event_decade_before_1910_is_rejected():
+@pytest.mark.parametrize("year", [1908, 1909])
+def test_1908_and_1909_event_files_are_in_the_1910s_archive(year):
+    """Checked against the real archive: 1910seve.zip holds 1908 and 1909 files too."""
+    r = resolve(Product.EVENTS_DECADE, season=year)
+    assert r.url == f"{B}/events/1910seve.zip" and r.group == "1910seve"
+
+
+@pytest.mark.parametrize("year", [1871, 1900, 1907])
+def test_event_decade_before_1908_is_rejected(year):
     with pytest.raises(ValueError):
-        resolve(Product.EVENTS_DECADE, season=1909)
+        resolve(Product.EVENTS_DECADE, season=year)
 
 
 @pytest.mark.parametrize(

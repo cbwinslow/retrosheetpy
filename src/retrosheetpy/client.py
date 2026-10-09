@@ -125,8 +125,8 @@ class Client:
         )
         # Drop the old record first: a stop between the two writes is then a plain cache miss.
         meta.unlink(missing_ok=True)
-        _atomic_write(data, payload)
-        _atomic_write(meta, art.to_json().encode())
+        atomic_write(data, payload)
+        atomic_write(meta, art.to_json().encode())
         return art
 
 
@@ -153,7 +153,7 @@ def _check_zip_payload(payload: bytes, url: str) -> None:
         raise InvalidArchiveError(f"{url} did not return a valid zip archive") from exc
 
 
-def _atomic_write(path: Path, payload: bytes) -> None:
+def atomic_write(path: Path, payload: bytes) -> None:
     # Unique temp name in the same folder, so concurrent writers never share a file.
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
     try:

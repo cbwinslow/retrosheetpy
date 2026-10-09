@@ -19,3 +19,11 @@ class UnsafeArchiveMemberError(RetrosheetError):
 
 class ArchiveTooLargeError(InvalidArchiveError):
     """A zip holds more members or more data than any Retrosheet archive should (zip-bomb guard)."""
+
+
+class ToolError(RetrosheetError):
+    """A chadwickpy tool run on a season exited with an error."""
+
+
+class SeasonNotFoundError(RetrosheetError):
+    """Retrosheet's archive has no files for the season (or kind) that was asked for."""

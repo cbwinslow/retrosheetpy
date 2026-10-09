@@ -6,7 +6,7 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE", "NOTICE", "COPYING-chadwick"]
 requires-python = ">=3.11"
-dependencies = ["chadwickpy>=0.1.1"]
+dependencies = ["chadwickpy>=0.2.0"]
 authors = [{ name = "C. B. Winslow" }]
 keywords = ["baseball", "retrosheet", "chadwick", "play-by-play", "sabermetrics", "data"]
 classifiers = [
@@ -22,6 +22,9 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Information Analysis",
   "Typing :: Typed",
 ]
+
+[project.optional-dependencies]
+pandas = ["pandas"]  # for Table.to_pandas()
 
 [project.urls]
 Homepage = "https://github.com/cbwinslow/retrosheetpy"
