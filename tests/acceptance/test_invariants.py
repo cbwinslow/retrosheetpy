@@ -9,6 +9,7 @@ import io
 import json
 import re
 import sqlite3
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -41,12 +42,12 @@ TRACE: dict[int, list[str]] = {
         "test_kinds.py::test_allstar",
         "test_kinds.py::test_negro_leagues_year_named_files_and_no_team_list_from_retrosheet",
         "test_kinds.py::test_unknown_kind_is_refused_before_anything_downloads",
-        "acceptance/test_invariants.py::test_every_kind_and_every_format_on_tiny_fixtures",
+        "acceptance/test_invariants.py::test_every_kind_and_table_in_every_format_holds_the_tools_rows",
     ],
     4: [
         "test_parity_c.py::test_equals_the_c_tool",
         "test_parity_c.py::test_every_kind_equals_the_c_tool",
-        "acceptance/test_invariants.py::test_every_format_carries_the_same_rows",
+        "acceptance/test_invariants.py::test_every_kind_and_table_in_every_format_holds_the_tools_rows",
     ],
     5: [
         "test_cache.py::test_missing_season_is_an_error_and_leaves_no_folder",
@@ -120,52 +121,62 @@ def table(name: str, kind: Kind, year: int, cache: Path):  # type: ignore[no-unt
     return getattr(rs, name)(year, kind=kind, cache=cache, fetch=fake.fetch_any)
 
 
+@pytest.mark.parametrize("name", ROW_TABLES)
 @pytest.mark.parametrize(("kind", "year"), KINDS)
-def test_every_kind_and_every_format_on_tiny_fixtures(kind: Kind, year: int, cache: Path) -> None:
-    # Play-by-play kinds have events; box-score-only kinds have games but no plays.
-    games = table("games", kind, year, cache)
-    assert len(games.load()) >= 1
-    for fmt_check in (_csv, _jsonl, _json, _sqlite):
-        fmt_check(games, cache.parent / f"{kind.value}-{fmt_check.__name__}")
-    box = rs.boxscores(year, kind=kind, cache=cache, fetch=fake.fetch_any)
-    assert box.text().strip()
+def test_every_kind_and_table_in_every_format_holds_the_tools_rows(
+    kind: Kind, year: int, name: str, cache: Path
+) -> None:
+    """Shaping adds structure, not meaning: each format reads back as exactly the tool's rows."""
+    t = table(name, kind, year, cache)
+    rows = [tuple(r.values()) for r in t.load()]
+    base = cache.parent / f"{kind.value}-{name}"
+    _csv(t, base, rows)
+    _jsonl(t, base)
+    _json(t, base)
+    _sqlite(t, base, rows)
 
 
-def _csv(t, base: Path) -> None:  # type: ignore[no-untyped-def]
-    t.to_csv(base.with_suffix(".csv"))
-    rows = list(csv.reader(io.StringIO(base.with_suffix(".csv").read_text())))
-    assert rows[0] == list(t.columns) and len(rows) == len(t.load()) + 1
+@pytest.mark.parametrize(("kind", "year"), KINDS)
+def test_every_kind_has_games_and_box_scores(kind: Kind, year: int, cache: Path) -> None:
+    assert len(table("games", kind, year, cache).load()) >= 1
+    assert rs.boxscores(year, kind=kind, cache=cache, fetch=fake.fetch_any).text().strip()
+
+
+def test_box_scores_in_xml(cache: Path) -> None:
+    box = rs.boxscores(2010, cache=cache, fetch=fake.fetch)
+    assert box.xml().lstrip().startswith("<boxscore ")
+    out = cache.parent / "box.txt"
+    box.write(out)
+    assert out.read_text() == box.text()
+
+
+def _csv(t, base: Path, rows: list[tuple[str, ...]]) -> None:  # type: ignore[no-untyped-def]
+    path = base.with_suffix(".csv")
+    t.to_csv(path)
+    got = list(csv.reader(io.StringIO(path.read_text())))
+    assert got[0] == list(t.columns) and [tuple(r) for r in got[1:]] == rows
 
 
 def _jsonl(t, base: Path) -> None:  # type: ignore[no-untyped-def]
-    t.to_jsonl(base.with_suffix(".jsonl"))
-    got = [json.loads(x) for x in base.with_suffix(".jsonl").read_text().splitlines()]
-    assert got == t.load()
+    path = base.with_suffix(".jsonl")
+    t.to_jsonl(path)
+    assert [json.loads(x) for x in path.read_text().splitlines()] == t.load()
 
 
 def _json(t, base: Path) -> None:  # type: ignore[no-untyped-def]
-    t.to_json(base.with_suffix(".json"))
-    assert json.loads(base.with_suffix(".json").read_text()) == t.load()
+    path = base.with_suffix(".json")
+    t.to_json(path)
+    assert json.loads(path.read_text()) == t.load()
 
 
-def _sqlite(t, base: Path) -> None:  # type: ignore[no-untyped-def]
-    t.to_sqlite(base.with_suffix(".db"), table="t")
-    con = sqlite3.connect(base.with_suffix(".db"))
+def _sqlite(t, base: Path, rows: list[tuple[str, ...]]) -> None:  # type: ignore[no-untyped-def]
+    path = base.with_suffix(".db")
+    t.to_sqlite(path, table="t")
+    con = sqlite3.connect(path)
     try:
-        assert con.execute("select count(*) from t").fetchone()[0] == len(t.load())
+        assert con.execute("select * from t").fetchall() == rows
     finally:
         con.close()
-
-
-@pytest.mark.parametrize("name", ROW_TABLES)
-def test_every_format_carries_the_same_rows(name: str, cache: Path) -> None:
-    """Shaping adds structure, not meaning: every format holds exactly the tool's rows."""
-    t = table(name, Kind.REGULAR, 2010, cache)
-    base = cache.parent / name
-    _csv(t, base)
-    _jsonl(t, base)
-    _json(t, base)
-    _sqlite(t, base)
 
 
 # --- 5. clear failures ------------------------------------------------------------------------
@@ -175,7 +186,7 @@ def test_a_failing_tool_names_the_tool_and_the_season(
     cache: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     s = rs.season(2010, cache=cache, fetch=fake.fetch)
-    cmd = ["python3", "-c", "import sys; sys.stderr.write('bad option'); sys.exit(3)"]
+    cmd = [sys.executable, "-c", "import sys; sys.stderr.write('bad option'); sys.exit(3)"]
     monkeypatch.setattr(runner, "command", lambda *a, **k: cmd)
     with pytest.raises(ToolError) as err:
         s.events().load()
