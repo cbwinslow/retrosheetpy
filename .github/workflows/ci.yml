@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CHADWICK_REF: c685ab5 # the same pinned commit chadwickpy is compared with
+  CHADWICK_REF: v0.11.0 # the same release chadwickpy is compared with
 
 jobs:
   lint:

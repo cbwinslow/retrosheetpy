@@ -42,9 +42,9 @@ def test_every_column_is_present_and_named_as_chadwick_names_them(cache: Path) -
     assert (
         t.columns[:3] == ("GAME_ID", "AWAY_TEAM_ID", "INN_CT") and t.columns[-1] == "RUN3_AUTO_FL"
     )
-    assert len(q("games", 2010, cache).columns) == 182
+    assert len(q("games", 2010, cache).columns) == 183
     assert len(q("daily", 2010, cache).columns) == 154
-    assert len(q("subs", 2010, cache).columns) == 25
+    assert len(q("subs", 2010, cache).columns) == 26
     assert len(q("comments", 2010, cache).columns) == 10
 
 
@@ -250,7 +250,7 @@ def test_sqlite(cache: Path, tmp_path: Path) -> None:
     con = sqlite3.connect(db)
     assert con.execute("select count(*) from games").fetchone() == (4,)
     assert con.execute('select "GAME_ID" from games order by 1').fetchall()[-1] == ("BBB201004070",)
-    assert len(con.execute("pragma table_info(games)").fetchall()) == 182
+    assert len(con.execute("pragma table_info(games)").fetchall()) == 183
     with pytest.raises(ValueError, match="already exists"):
         t.to_sqlite(db)
     assert t.to_sqlite(db, if_exists="append") == 4
@@ -300,7 +300,7 @@ def test_pandas(cache: Path) -> None:
     pd = pytest.importorskip("pandas")
     df = q("games", 2010, cache).to_pandas()
     assert (
-        isinstance(df, pd.DataFrame) and df.shape == (3, 182) and df["GAME_ID"][0] == "AAA201004050"
+        isinstance(df, pd.DataFrame) and df.shape == (3, 183) and df["GAME_ID"][0] == "AAA201004050"
     )
 
 

@@ -32,9 +32,9 @@ They are Chadwick's six programs, with Chadwick's names and Chadwick's column na
 | Table | One row per | Columns | Chadwick |
 | --- | --- | --- | --- |
 | `events` | play | 164 | `cwevent` |
-| `games` | game | 182 | `cwgame` |
+| `games` | game | 183 | `cwgame` |
 | `daily` | player per game | 154 | `cwdaily` |
-| `subs` | substitution | 25 | `cwsub` |
+| `subs` | substitution | 26 | `cwsub` |
 | `comments` | comment record | 10 | `cwcomment` |
 | `boxscores` | (text) | | `cwbox` (text, XML, SportsML) |
 

@@ -9,10 +9,10 @@ resolution-markers = [
     "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -82,11 +82,11 @@ wheels = [
 
 [[package]]
 name = "chadwickpy"
-version = "0.2.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/92/cf/bf47ab340c914277f53721767685fea5a0e8ac5b32ce922962dbff6c02ca/chadwickpy-0.2.0.tar.gz", hash = "sha256:266d196d0b180002a682510861ef35a128bae998a24c3147b2c862fa6130d760", size = 354227, upload-time = "2026-10-05T08:12:02.547Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/54/85d730da1241a75117311d06d36ba8d5a6114711ce67f66558f4bae658a0/chadwickpy-0.4.0.tar.gz", hash = "sha256:a1800b966d81407e4cbceaffac6bf9c3eba4dc37c2f36a590f70bb0a2fc7f800", size = 439546, upload-time = "2026-10-08T04:32:41.698Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c4/ae/2fc85c284bc6ac860d05f8500577df40d52cb42c326ba334fc030d8fd782/chadwickpy-0.2.0-py3-none-any.whl", hash = "sha256:b2e13d78f963baf1e1287a69ebcf464511b827d87d50ff7973cc2ef11a41baaa", size = 118679, upload-time = "2026-10-05T08:12:01.31Z" },
+    { url = "https://files.pythonhosted.org/packages/95/87/7905d8d440d8d026e4481acb9ecf0cd1a662f1e99078f84fa9c19ea2f36a/chadwickpy-0.4.0-py3-none-any.whl", hash = "sha256:66c88a848c1a29cf222d41eaeac269d166ef92a36220ad29f2f7afccc35abf40", size = 126892, upload-time = "2026-10-08T04:32:39.75Z" },
 ]
 
 [[package]]
@@ -731,7 +731,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "chadwickpy", specifier = ">=0.2.0" },
+    { name = "chadwickpy", specifier = ">=0.4.0" },
     { name = "pandas", marker = "extra == 'pandas'" },
 ]
 provides-extras = ["pandas"]
