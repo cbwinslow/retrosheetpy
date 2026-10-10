@@ -80,7 +80,7 @@ def command(
     box: BoxFormat = "text",
     files: list[str] | None = None,
 ) -> list[str]:
-    cmd = [sys.executable, "-m", "chadwickpy", tool.command, "-q", "-y", str(season.year)]
+    cmd = [sys.executable, "-m", "chadwickpy", tool.command, "-Q", "-y", str(season.year)]
     if opts.game:
         cmd += ["-i", opts.game]
     if opts.start:

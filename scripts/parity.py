@@ -33,7 +33,7 @@ def _digest(path: Path) -> tuple[str, int]:
 
 
 def _c_command(c_bin: Path, tool: Tool, year: int, o: Options, files: list[str]) -> list[str]:
-    cmd = [str(c_bin / tool.command), "-q", "-y", str(year)]
+    cmd = [str(c_bin / tool.command), "-Q", "-y", str(year)]
     for flag, value in (("-i", o.game), ("-s", o.start), ("-e", o.end)):
         if value:
             cmd += [flag, value]

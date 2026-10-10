@@ -71,7 +71,7 @@ def games(
     fetch: Fetch = http_fetch,
     **opts: Unpack[Opts],
 ) -> Table:
-    """One row per game (cwgame), 182 columns."""
+    """One row per game (cwgame), 183 columns."""
     return _table("games", years, cache, fetch, kind, opts)
 
 

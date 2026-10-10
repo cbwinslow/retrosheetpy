@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def c_command(tool: Tool, year: int, o: Options, files: list[str]) -> list[str]:
-    cmd = [str(BIN / tool.command), "-q", "-y", str(year)]
+    cmd = [str(BIN / tool.command), "-Q", "-y", str(year)]
     for flag, value in (("-i", o.game), ("-s", o.start), ("-e", o.end)):
         if value:
             cmd += [flag, value]
@@ -94,7 +94,7 @@ def test_box_xml_equals_the_c_tool(tmp_path: Path) -> None:
     mine = io.BytesIO()
     runner.run(tool, season, mine, Options(), box="xml")
     theirs = subprocess.run(  # noqa: S603
-        [str(BIN / "cwbox"), "-q", "-y", "2010", "-X", *(p.name for p in season.event_files)],
+        [str(BIN / "cwbox"), "-Q", "-y", "2010", "-X", *(p.name for p in season.event_files)],
         cwd=season.folder,
         capture_output=True,
         check=True,
