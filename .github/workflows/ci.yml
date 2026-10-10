@@ -90,11 +90,7 @@ jobs:
           export CHADWICK_BIN="$HOME/chadwick-parity-install/bin"
           test -x "$CHADWICK_BIN/cwevent" || { echo "Chadwick build missing"; exit 1; }
           set -o pipefail  # otherwise the pipe reports tee's status and failing tests pass CI
-          # chadwickpy 0.2.0 (on PyPI) has bugs that make some box-score output differ from C; the
-          # fixes are on its main branch. Test against that exact commit until 0.2.1 is released,
-          # then delete the --with chadwickpy line and require chadwickpy>=0.2.1 in pyproject.toml.
           uv run --with pytest --with pandas \
-            --with "chadwickpy @ git+https://github.com/cbwinslow/chadwickpy.git@77692bae1921b648b3c8ae74d0a1d7a968cb0f55" \
             pytest -q -rs -p no:cacheprovider | tee pytest.out
           # A skipped test compared nothing: with Chadwick and pandas present, nothing may be skipped.
           if grep -q '^SKIPPED' pytest.out; then echo "tests were skipped"; exit 1; fi
