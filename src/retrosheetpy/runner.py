@@ -136,13 +136,18 @@ def stream(
     with tempfile.TemporaryFile() as errors:
         # Own process group: chadwickpy starts worker processes, and killing only its main process
         # would leave them running for ever. Stopping the group stops them too.
-        proc = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
-            cmd,
-            cwd=season.folder,
-            stdout=subprocess.PIPE,
-            stderr=errors,
-            start_new_session=os.name == "posix",
-        )
+        try:
+            proc = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
+                cmd,
+                cwd=season.folder,
+                stdout=subprocess.PIPE,
+                stderr=errors,
+                start_new_session=os.name == "posix",
+            )
+        except OSError as exc:
+            raise ToolError(
+                f"{tool.command} could not be started for {season.year}: {exc}"
+            ) from exc
         assert proc.stdout is not None  # noqa: S101 - guaranteed by stdout=PIPE
         finished = False
         try:
