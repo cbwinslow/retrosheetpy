@@ -161,9 +161,6 @@ def _sqlite(t, base: Path) -> None:  # type: ignore[no-untyped-def]
 def test_every_format_carries_the_same_rows(name: str, cache: Path) -> None:
     """Shaping adds structure, not meaning: every format holds exactly the tool's rows."""
     t = table(name, Kind.REGULAR, 2010, cache)
-    rows = t.load()
-    if not rows:
-        pytest.skip(f"the made-up season has no {name} rows")
     base = cache.parent / name
     _csv(t, base)
     _jsonl(t, base)
