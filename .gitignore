@@ -18,3 +18,4 @@ htmlcov/
 *.duckdb
 *.parquet
 *.csv
+site/
