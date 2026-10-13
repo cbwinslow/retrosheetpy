@@ -17,9 +17,13 @@ def test_manifest_urls() -> None:
         == "https://www.retrosheet.org/events/2024seve.zip"
     )
     assert manifest.gamelog_archive_url(2023) == "https://www.retrosheet.org/gamelogs/gl2023.zip"
-    assert manifest.schedule_archive_url(2022) == "https://www.retrosheet.org/schedule/2022sked.zip"
+    assert manifest.schedule_archive_url(2022) == "https://www.retrosheet.org/schedule/2022SKED.zip"
     assert manifest.park_url() == "https://www.retrosheet.org/parkcode.txt"
-    assert manifest.bio_url() == "https://www.retrosheet.org/biofile.txt"
+    assert manifest.bio_url() == "https://www.retrosheet.org/biofile.zip"
+    assert manifest.ejections_url() == "https://www.retrosheet.org/ejections.csv"
+    assert manifest.transactions_url() == "https://www.retrosheet.org/transactions/tranDB.zip"
+    assert manifest.postseason_archive_url(2024) == "https://www.retrosheet.org/events/2024post.zip"
+    assert manifest.allstar_archive_url(2024) == "https://www.retrosheet.org/events/2024as.zip"
 
 
 def test_cache_manager(tmp_path: Path) -> None:
@@ -63,12 +67,16 @@ def test_downloader_with_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr(downloader, "_fetch_bytes", mock_fetch)
 
-    # First fetch should download and cache
-    extracted_dir = downloader.get_gamelogs(2024)
+    # First call triggers download
+    dir1 = downloader.get_gamelogs(2024)
+    assert (dir1 / "gl2024.txt").exists()
     assert called == 1
-    assert (extracted_dir / "gl2024.txt").exists()
 
-    # Second fetch should use cache without hitting network
-    extracted_dir_2 = downloader.get_gamelogs(2024)
+    # Second call uses cache (does not call fetch)
+    dir2 = downloader.get_gamelogs(2024)
+    assert dir1 == dir2
     assert called == 1
-    assert extracted_dir_2 == extracted_dir
+
+    # Force triggers re-download
+    downloader.get_gamelogs(2024, force=True)
+    assert called == 2

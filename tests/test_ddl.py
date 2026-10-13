@@ -28,6 +28,23 @@ def test_generate_ddl_dialects() -> None:
     assert "CREATE TABLE IF NOT EXISTS parks (" in sqlite_parks
     assert "start_date TEXT" in sqlite_parks
 
+    # BigQuery
+    bq_sked = generate_ddl("schedules", dialect="bigquery")
+    assert "CREATE TABLE IF NOT EXISTS schedules (" in bq_sked
+    assert "date DATE" in bq_sked
+    assert "vis_game_num INT64" in bq_sked
+    assert "day_of_week STRING" in bq_sked
+
+    # Snowflake
+    sf_bio = generate_ddl("bio", dialect="snowflake")
+    assert "CREATE TABLE IF NOT EXISTS biographical (" in sf_bio
+    assert "birth_date DATE" in sf_bio
+    assert "height_inches SMALLINT" in sf_bio
+
+    # Ejections & Transactions
+    assert "CREATE TABLE IF NOT EXISTS ejections (" in generate_ddl("ejections")
+    assert "CREATE TABLE IF NOT EXISTS transactions (" in generate_ddl("transactions")
+
 
 def test_pre_existing_table_column_alignment(tmp_path: Path) -> None:
     db_path = tmp_path / "pre_existing.duckdb"

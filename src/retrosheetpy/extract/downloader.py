@@ -47,6 +47,26 @@ class Downloader:
         self.cache.save_archive("events", year, content)
         return self.cache.extract_archive("events", year)
 
+    def get_postseason(self, year: int, force: bool = False) -> Path:
+        """Downloads and extracts postseason event files for a given year."""
+        if not force and self.cache.is_extracted("postseason", year):
+            return self.cache.get_extracted_dir("postseason", year)
+
+        url = self.manifest.postseason_archive_url(year)
+        content = self._fetch_bytes(url)
+        self.cache.save_archive("postseason", year, content)
+        return self.cache.extract_archive("postseason", year)
+
+    def get_allstar(self, year: int, force: bool = False) -> Path:
+        """Downloads and extracts All-Star Game event files for a given year."""
+        if not force and self.cache.is_extracted("allstar", year):
+            return self.cache.get_extracted_dir("allstar", year)
+
+        url = self.manifest.allstar_archive_url(year)
+        content = self._fetch_bytes(url)
+        self.cache.save_archive("allstar", year, content)
+        return self.cache.extract_archive("allstar", year)
+
     def get_gamelogs(self, year: int, force: bool = False) -> Path:
         """Downloads and extracts game log files for a given year."""
         if not force and self.cache.is_extracted("gamelogs", year):
@@ -80,13 +100,42 @@ class Downloader:
         return target
 
     def get_bio(self, force: bool = False) -> Path:
-        """Downloads player biographical database text file."""
-        target = self.cache.root / "bio" / "biofile.txt"
+        """Downloads and extracts master biographical archive, returning path to biofile0.csv."""
+        target_dir = self.cache.get_extracted_dir("bio", "master")
+        target_csv = target_dir / "biofile0.csv"
+        if not force and target_csv.is_file() and target_csv.stat().st_size > 0:
+            return target_csv
+
+        url = self.manifest.bio_url()
+        content = self._fetch_bytes(url)
+        self.cache.save_archive("bio", "master", content)
+        extracted = self.cache.extract_archive("bio", "master")
+        csv_file = extracted / "biofile0.csv"
+        if not csv_file.exists():
+            csv_file = extracted / "biofile.csv"
+        return csv_file
+
+    def get_ejections(self, force: bool = False) -> Path:
+        """Downloads official ejections CSV file."""
+        target = self.cache.root / "ejections" / "ejections.csv"
         target.parent.mkdir(parents=True, exist_ok=True)
         if not force and target.is_file() and target.stat().st_size > 0:
             return target
 
-        url = self.manifest.bio_url()
+        url = self.manifest.ejections_url()
         content = self._fetch_bytes(url)
         target.write_bytes(content)
         return target
+
+    def get_transactions(self, force: bool = False) -> Path:
+        """Downloads and extracts transactions database, returning path to tran.txt."""
+        target_dir = self.cache.get_extracted_dir("transactions", "master")
+        target_txt = target_dir / "tran.txt"
+        if not force and target_txt.is_file() and target_txt.stat().st_size > 0:
+            return target_txt
+
+        url = self.manifest.transactions_url()
+        content = self._fetch_bytes(url)
+        self.cache.save_archive("transactions", "master", content)
+        extracted = self.cache.extract_archive("transactions", "master")
+        return extracted / "tran.txt"

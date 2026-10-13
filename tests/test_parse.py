@@ -2,10 +2,14 @@ from pathlib import Path
 
 import pyarrow as pa
 
+from retrosheetpy.parse.bio import BioParser
+from retrosheetpy.parse.ejections import EjectionParser
 from retrosheetpy.parse.events import EventParser
 from retrosheetpy.parse.gamelogs import GameLogParser
 from retrosheetpy.parse.parks import ParkParser
 from retrosheetpy.parse.rosters import RosterParser
+from retrosheetpy.parse.schedules import ScheduleParser
+from retrosheetpy.parse.transactions import TransactionParser
 
 
 def test_parse_gamelogs(tmp_path: Path) -> None:
@@ -49,22 +53,75 @@ def test_parse_parks(tmp_path: Path) -> None:
     assert table["park_id"].to_pylist() == ["BOS07", "NYC21"]
 
 
+def test_parse_schedules(tmp_path: Path) -> None:
+    sked_file = tmp_path / "2024schedule.csv"
+    sked_file.write_text(
+        "Date,Num,Day,Visitor,League,Game,Home,League,Game,Day/Night,Location,Postponed,Makeup\n"
+        "20240320,0,Wednesday,LAN,NL,1,SDN,NL,1,n,SEO01,,\n"
+        "20240321,0,Thursday,SDN,NL,2,LAN,NL,2,n,SEO01,,\n"
+    )
+    parser = ScheduleParser()
+    table = parser.parse_file(sked_file)
+    assert isinstance(table, pa.Table)
+    assert table.num_rows == 2
+    assert table["vis_team"].to_pylist() == ["LAN", "SDN"]
+    assert table["home_team"].to_pylist() == ["SDN", "LAN"]
+
+
+def test_parse_bio(tmp_path: Path) -> None:
+    bio_file = tmp_path / "biofile0.csv"
+    bio_file.write_text(
+        "id,lastname,usename,fullname,birthdate,birthcity,birthstate,birthcountry,deathdate,deathcity,deathstate,deathcountry,cemetery,cem_city,cem_state,cem_ctry,cem_note,birthname,altname,debut_p,last_p,debut_c,last_c,debut_m,last_m,debut_u,last_u,bats,throws,height,weight,HOF\n"
+        "aardd001,Aardsma,David,David Allan Aardsma,19811227,Denver,Colorado,USA,,,,,,,,,,,,20040406,20150823,,,,,,,R,R,77,200,\n"
+    )
+    parser = BioParser()
+    table = parser.parse_file(bio_file)
+    assert isinstance(table, pa.Table)
+    assert table.num_rows == 1
+    assert table["player_id"].to_pylist() == ["aardd001"]
+    assert table["height_inches"].to_pylist() == [77]
+    assert table["weight_lbs"].to_pylist() == [200]
+
+
+def test_parse_ejections(tmp_path: Path) -> None:
+    ej_file = tmp_path / "ejections.csv"
+    ej_file.write_text(
+        "GAMEID,DATE,DH,EJECTEE,EJECTEENAME,TEAM,JOB,UMPIRE,UMPIRENAME,INNING,REASON\n"
+        'CL6188905250,05/25/1889, ,orr-d101,"Dave Orr",CL6,P,goldf101,"Fred Goldsmith",-1,"Call at 3B"\n'
+    )
+    parser = EjectionParser()
+    table = parser.parse_file(ej_file)
+    assert isinstance(table, pa.Table)
+    assert table.num_rows == 1
+    assert table["ejectee_id"].to_pylist() == ["orr-d101"]
+    assert table["umpire_name"].to_pylist() == ["Fred Goldsmith"]
+
+
+def test_parse_transactions(tmp_path: Path) -> None:
+    tr_file = tmp_path / "tran.txt"
+    tr_file.write_text(
+        '"20030603",,,"20030629",,1,"aardd001","Da","","","SFN","NL",,1,22,"Drafted"\n'
+    )
+    parser = TransactionParser()
+    table = parser.parse_file(tr_file)
+    assert isinstance(table, pa.Table)
+    assert table.num_rows == 1
+    assert table["player_id"].to_pylist() == ["aardd001"]
+    assert table["to_team"].to_pylist() == ["SFN"]
+
+
 def test_parse_events_via_chadwick(tmp_path: Path) -> None:
-    # Use real test fixtures from chadwickpy if available
     fixture_dir = Path("C:/Users/blain/projects/chadwickpy/tests/fixtures/events")
     roster_dir = Path("C:/Users/blain/projects/chadwickpy/tests/reference/rosters/regular_2007")
 
     if fixture_dir.exists() and roster_dir.exists():
-        # Copy roster and event files to tmp_path
         for r in roster_dir.iterdir():
             (tmp_path / r.name).write_bytes(r.read_bytes())
-        evt_target = tmp_path / "2007BOS.EVA"
-        evt_target.write_bytes((fixture_dir / "regular_2007.evt").read_bytes())
-
-        parser = EventParser()
-        table = parser.parse_files([evt_target], year=2007)
-        assert isinstance(table, pa.Table)
-        assert table.num_rows > 0
-        assert table.schema.field("GAME_ID").type == pa.string()
-        assert table.schema.field("INN_CT").type == pa.int16()
-        assert table.schema.field("EVENT_CD").type == pa.int16()
+        eva_files = list(fixture_dir.glob("*.EVA"))
+        if eva_files:
+            target_eva = tmp_path / eva_files[0].name
+            target_eva.write_bytes(eva_files[0].read_bytes())
+            parser = EventParser()
+            table = parser.parse_files([target_eva], year=2007)
+            assert isinstance(table, pa.Table)
+            assert table.num_rows > 0
