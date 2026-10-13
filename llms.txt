@@ -1,0 +1,73 @@
+# retrosheetpy
+
+> Fast, modular, and strongly-typed Retrosheet baseball data downloader, parser, and database ingestor for Python (3.11+).
+
+`retrosheetpy` is designed for sabermetricians, data engineers, researchers, and database administrators. It handles downloading, caching, schema enforcement, and zero-copy ingestion of Retrosheet data into DuckDB, Apache Arrow, Polars, pandas, and cloud data warehouses (PostgreSQL, Snowflake, BigQuery) via `dlt`.
+
+## Core Features
+- **Zero-Copy Arrow Architecture:** Type-safe PyArrow tables with exact physical data types (`date32`, `int8`, `int16`, `int32`, `bool_`, `string`).
+- **Complete Retrosheet Catalog:** Full support for Events (164-col play-by-play), Postseason, All-Star games, Game Logs (161-col), Rosters, Ballparks, Schedules, Biographical encyclopedia, Ejections, and Player Transactions.
+- **Multi-Engine Ingestion:** Direct insertion into embedded DuckDB (`.duckdb`) and cloud data warehouses (Postgres, Snowflake, BigQuery) via `dlt`.
+- **Pre-Existing Table Alignment:** Gracefully inspects target tables and appends to matching columns without altering table structure or discarding custom DBA constraints.
+- **Compact CLI:** Simple, compact CLI flags (`-s`, `-y`, `-d`, `-c`, `-f`, `-o`) for downloading, ingesting, exporting, and generating DDL.
+- **Production SQL DDL:** Generates standard `CREATE TABLE` DDL statements across PostgreSQL, DuckDB, SQLite, Snowflake, and BigQuery.
+
+## Quick Install
+```bash
+# Core install (DuckDB, PyArrow, Polars, pandas, Parquet)
+pip install retrosheetpy
+
+# With cloud warehouse support (Postgres, Snowflake, BigQuery)
+pip install "retrosheetpy[dlt]"
+```
+
+## CLI Reference
+- `retrosheetpy download [-s dataset] [-y years] [--force]`: Prime local download cache in `~/.cache/retrosheetpy/`.
+- `retrosheetpy ingest [-d dest] [-c conn_or_file] [-s datasets] [-y years] [--force]`: Ingest into DuckDB or remote warehouses.
+- `retrosheetpy export -s dataset -y years -f parquet|csv -o path`: Export datasets to compressed Parquet or CSV.
+- `retrosheetpy ddl -s dataset [--dialect postgres|duckdb|sqlite|snowflake|bigquery]`: Generate production SQL DDL.
+- `retrosheetpy cache [--clear]`: Inspect or clear local cache.
+
+## Python API Quickstart
+```python
+import retrosheetpy as rs
+
+# 1. Load into Polars, pandas, or PyArrow
+events_df = rs.events(2024, backend="polars")
+gamelogs_df = rs.game_logs(range(2020, 2025), backend="polars")
+rosters_tbl = rs.rosters(2024, backend="arrow")
+parks_df = rs.parks(backend="pandas")
+sked_df = rs.schedules(2024, backend="polars")
+bio_df = rs.bio(backend="polars")
+ejections_df = rs.ejections(backend="polars")
+transactions_df = rs.transactions(backend="polars")
+
+# 2. Ingest into DuckDB
+rs.to_duckdb(
+    "baseball.duckdb",
+    years=[2023, 2024],
+    datasets=["events", "gamelogs", "rosters", "parks", "schedules", "bio"],
+)
+
+# 3. Export to Parquet
+rs.to_parquet("events_2024.parquet", dataset="events", years=2024)
+
+# 4. Ingest into Postgres via dlt
+rs.to_dlt(
+    destination="postgres",
+    years=[2024],
+    datasets=["events", "gamelogs", "rosters", "parks"],
+    credentials="postgresql://user:pass@localhost:5432/retrosheet",
+)
+```
+
+## Full Documentation Links
+- [Documentation Home](https://cbwinslow.github.io/retrosheetpy/)
+- [Quickstart Guide](https://cbwinslow.github.io/retrosheetpy/quickstart/)
+- [CLI Guide](https://cbwinslow.github.io/retrosheetpy/cli/)
+- [Event Schema Reference (164 columns)](https://cbwinslow.github.io/retrosheetpy/reference/events-schema/)
+- [Game Log Schema Reference (161 columns)](https://cbwinslow.github.io/retrosheetpy/reference/gamelogs-schema/)
+- [DuckDB Guide](https://cbwinslow.github.io/retrosheetpy/duckdb/)
+- [dlt & Cloud Warehouses](https://cbwinslow.github.io/retrosheetpy/dlt/)
+- [SQL DDL Generation](https://cbwinslow.github.io/retrosheetpy/ddl/)
+- [Sabermetric Cookbooks](https://cbwinslow.github.io/retrosheetpy/cookbook/re24/)
