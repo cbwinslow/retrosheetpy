@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 import httpx
@@ -111,12 +112,14 @@ class Downloader:
         self.cache.save_archive("bio", "master", content)
         extracted = self.cache.extract_archive("bio", "master")
         csv_file = extracted / "biofile0.csv"
-        if not csv_file.exists():
+        if not csv_file.is_file():
             csv_file = extracted / "biofile.csv"
+        if not csv_file.is_file():
+            raise FileNotFoundError(f"Biofile CSV not found in extracted archive at {extracted}")
         return csv_file
 
     def get_ejections(self, force: bool = False) -> Path:
-        """Downloads official ejections CSV file."""
+        """Downloads official ejections CSV file atomically."""
         target = self.cache.root / "ejections" / "ejections.csv"
         target.parent.mkdir(parents=True, exist_ok=True)
         if not force and target.is_file() and target.stat().st_size > 0:
@@ -124,7 +127,16 @@ class Downloader:
 
         url = self.manifest.ejections_url()
         content = self._fetch_bytes(url)
-        target.write_bytes(content)
+        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False, suffix=".csv.tmp") as tmp:
+            tmp_path = Path(tmp.name)
+            tmp.write(content)
+
+        try:
+            tmp_path.replace(target)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
         return target
 
     def get_transactions(self, force: bool = False) -> Path:

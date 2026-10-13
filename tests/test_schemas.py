@@ -92,7 +92,7 @@ def test_extended_schemas() -> None:
 
     assert len(EJECTION_SCHEMA) == 11
     assert EJECTION_SCHEMA.field("date").type == pa.date32()
-    assert EJECTION_SCHEMA.field("inning").type == pa.int8()
+    assert EJECTION_SCHEMA.field("inning").type == pa.int16()
 
     assert len(TRANSACTION_SCHEMA) == 16
     assert TRANSACTION_SCHEMA.field("primary_date").type == pa.date32()

@@ -100,3 +100,19 @@ def test_cli_ingest_duckdb(tmp_path: Path, monkeypatch) -> None:
     )
     assert result.exit_code == 0
     assert db_path.exists()
+
+    import duckdb
+
+    with duckdb.connect(str(db_path)) as con:
+        count = con.execute("SELECT count(*) FROM game_logs").fetchone()[0]
+        assert count == 1
+
+    # Verify idempotency on repeated run
+    result_repeat = runner.invoke(
+        main,
+        ["ingest", "-d", "duckdb", "-c", str(db_path), "-s", "gamelogs", "-y", "2024"],
+    )
+    assert result_repeat.exit_code == 0
+    with duckdb.connect(str(db_path)) as con:
+        count = con.execute("SELECT count(*) FROM game_logs").fetchone()[0]
+        assert count == 1

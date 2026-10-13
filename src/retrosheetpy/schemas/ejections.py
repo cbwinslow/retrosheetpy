@@ -13,7 +13,7 @@ EJECTION_SCHEMA = pa.schema(
         pa.field("job", pa.string(), nullable=True),
         pa.field("umpire_id", pa.string(), nullable=True),
         pa.field("umpire_name", pa.string(), nullable=True),
-        pa.field("inning", pa.int8(), nullable=True),
+        pa.field("inning", pa.int16(), nullable=True),
         pa.field("reason", pa.string(), nullable=True),
     ]
 )
