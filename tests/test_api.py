@@ -51,3 +51,20 @@ def test_api_to_duckdb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         downloader=downloader,
     )
     assert db_path.exists()
+
+
+def test_api_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache = CacheManager(cache_dir=tmp_path / "cache")
+    downloader = Downloader(cache=cache)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("gl2024.txt", "dummy\n")
+    fake_zip = buf.getvalue()
+
+    monkeypatch.setattr(downloader, "_fetch_bytes", lambda url: fake_zip)
+
+    res = rs.download(years=[2024], datasets="gamelogs", downloader=downloader)
+    assert "gamelogs" in res
+    assert len(res["gamelogs"]) == 1
+    assert res["gamelogs"][0].exists()

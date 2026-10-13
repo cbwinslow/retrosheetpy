@@ -223,3 +223,58 @@ def to_dlt(
     pipeline = dlt.pipeline(pipeline_name=pipeline_name, destination=destination, **dlt_kwargs)
     source = retrosheet_source(years=years, datasets=datasets, downloader=downloader)
     return pipeline.run(source)
+
+
+def download(
+    years: int | Sequence[int] | None = None,
+    datasets: Sequence[str] | str = "all",
+    force: bool = False,
+    downloader: Downloader | None = None,
+) -> dict[str, list[Path]]:
+    """Downloads specified Retrosheet archives to local cache without loading them into memory.
+
+    Args:
+        years: Year or sequence of years to download. Defaults to [2024] if not provided.
+        datasets: Dataset or comma-separated list of datasets to download
+            ('events', 'gamelogs', 'rosters', 'parks', 'schedules', 'bio', or 'all').
+        force: If True, re-downloads even if already cached.
+        downloader: Optional custom Downloader instance.
+
+    Returns:
+        Dictionary mapping dataset name to list of extracted paths or file locations.
+    """
+    dl = downloader or Downloader()
+    results: dict[str, list[Path]] = {}
+
+    if isinstance(datasets, str):
+        if datasets.lower() == "all":
+            dataset_list = ["events", "gamelogs", "parks", "schedules", "bio"]
+        else:
+            dataset_list = [d.strip().lower() for d in datasets.split(",")]
+    else:
+        dataset_list = [d.lower() for d in datasets]
+
+    year_list = _normalize_years(years) if years is not None else [2024]
+
+    for d in dataset_list:
+        results[d] = []
+        if d in ("events", "rosters"):
+            for y in year_list:
+                p = dl.get_events(y, force=force)
+                results[d].append(p)
+        elif d in ("gamelogs", "game_logs"):
+            for y in year_list:
+                p = dl.get_gamelogs(y, force=force)
+                results[d].append(p)
+        elif d == "schedules":
+            for y in year_list:
+                p = dl.get_schedules(y, force=force)
+                results[d].append(p)
+        elif d == "parks":
+            p = dl.get_parks(force=force)
+            results[d].append(p)
+        elif d == "bio":
+            p = dl.get_bio(force=force)
+            results[d].append(p)
+
+    return results
