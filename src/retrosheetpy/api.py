@@ -1,195 +1,225 @@
-"""The functions most people use: ``events(2010)``, ``games(range(2000, 2011), home="NYA")``, ...
+"""High-level user-facing API for retrosheetpy."""
 
-Each takes one season or several (``years``), downloads and unpacks what is missing, and returns a
-:class:`Table` (or :class:`BoxScores`). Several seasons give one combined Table: the rows of each
-season in order, the header once. Rows already begin with the game id, which contains the year.
-"""
+from __future__ import annotations
 
-import subprocess
-import sys
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Unpack
+from typing import Any
 
-from retrosheetpy.cache import Season, print_notice
-from retrosheetpy.cache import get as get_season
-from retrosheetpy.client import Fetch, http_fetch
-from retrosheetpy.errors import ToolError
-from retrosheetpy.kinds import Kind
-from retrosheetpy.options import Options, Opts
-from retrosheetpy.table import BoxScores, Table
-from retrosheetpy.tools import TOOLS, tool
+import pyarrow as pa
 
-Years = int | Iterable[int]
-
-
-def _years(years: Years) -> list[int]:
-    listed = [years] if isinstance(years, int) else list(years)
-    if not listed:
-        raise ValueError("no years given")
-    if len(set(listed)) != len(listed):
-        raise ValueError(f"years repeat: {listed}")
-    return listed
+from retrosheetpy.extract.downloader import Downloader
+from retrosheetpy.parse.events import EventParser
+from retrosheetpy.parse.gamelogs import GameLogParser
+from retrosheetpy.parse.parks import ParkParser
+from retrosheetpy.parse.rosters import RosterParser
+from retrosheetpy.sink.dataframe import to_arrow, to_pandas, to_polars
+from retrosheetpy.sink.duckdb_sink import DuckDBSink
+from retrosheetpy.sink.file_sink import FileSink
 
 
-def _seasons(
-    years: Years, cache: str | Path | None, fetch: Fetch, kind: Kind | str
-) -> list[Season]:
-    kind = Kind.parse(kind)
-    return [
-        get_season(y, kind=kind, cache=cache, fetch=fetch, notice=print_notice)
-        for y in _years(years)
-    ]
+def _convert_backend(table: pa.Table, backend: str) -> Any:
+    b = backend.lower()
+    if b == "arrow":
+        return to_arrow(table)
+    if b == "polars":
+        return to_polars(table)
+    if b == "pandas":
+        return to_pandas(table)
+    raise ValueError(f"Unknown backend '{backend}'. Choose from 'arrow', 'polars', or 'pandas'.")
 
 
-def _table(
-    name: str, years: Years, cache: str | Path | None, fetch: Fetch, kind: Kind | str, opts: Opts
-) -> Table:
-    t = tool(name)
-    options = Options.build(t, opts)  # check the options before downloading anything
-    return Table(t, _seasons(years, cache, fetch, kind), options)
+def _normalize_years(years: int | Sequence[int]) -> list[int]:
+    if isinstance(years, int):
+        return [years]
+    return list(years)
 
 
 def events(
-    years: Years,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
-    **opts: Unpack[Opts],
-) -> Table:
-    """Every play: one row per event (Chadwick's cwevent), 164 columns."""
-    return _table("events", years, cache, fetch, kind, opts)
-
-
-def games(
-    years: Years,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
-    **opts: Unpack[Opts],
-) -> Table:
-    """One row per game (cwgame), 182 columns."""
-    return _table("games", years, cache, fetch, kind, opts)
-
-
-def daily(
-    years: Years,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
-    **opts: Unpack[Opts],
-) -> Table:
-    """One row per player per game (cwdaily), 154 columns."""
-    return _table("daily", years, cache, fetch, kind, opts)
-
-
-def subs(
-    years: Years,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
-    **opts: Unpack[Opts],
-) -> Table:
-    """One row per substitution (cwsub)."""
-    return _table("subs", years, cache, fetch, kind, opts)
-
-
-def comments(
-    years: Years,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
-    **opts: Unpack[Opts],
-) -> Table:
-    """One row per comment record (cwcomment)."""
-    return _table("comments", years, cache, fetch, kind, opts)
-
-
-def boxscores(
-    years: Years,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
-    **opts: Unpack[Opts],
-) -> BoxScores:
-    """Box scores (cwbox) as text, XML or SportsML."""
-    t = tool("boxscores")
-    options = Options.build(t, opts)
-    return BoxScores(t, _seasons(years, cache, fetch, kind), options)
-
-
-def season(
-    year: int,
-    *,
-    kind: Kind | str = Kind.REGULAR,
-    cache: str | Path | None = None,
-    fetch: Fetch = http_fetch,
+    year: int | Sequence[int],
+    backend: str = "arrow",
     force: bool = False,
-) -> Season:
-    """Download (if needed) and unpack one season; returns the :class:`Season` to ask tables of.
+    downloader: Downloader | None = None,
+) -> Any:
+    """Downloads, parses, and returns play-by-play events as a strongly-typed DataFrame or Arrow Table."""
+    dl = downloader or Downloader()
+    parser = EventParser()
+    year_list = _normalize_years(year)
+    tables: list[pa.Table] = []
 
-    ``kind`` picks the Retrosheet files: ``"regular"`` (default), ``"postseason"``, ``"allstar"``,
-    ``"negro"`` (Negro Leagues play-by-play), ``"negro_box"`` and ``"box"`` (games known only from
-    box scores)."""
-    return get_season(year, kind=kind, cache=cache, fetch=fetch, force=force, notice=print_notice)
+    for y in year_list:
+        extracted_dir = dl.get_events(y, force=force)
+        # Find all .EVA and .EVN files
+        files = sorted(list(extracted_dir.glob("*.EVA")) + list(extracted_dir.glob("*.EVN")))
+        if files:
+            tbl = parser.parse_files(files, year=y)
+            tables.append(tbl)
 
+    if not tables:
+        from retrosheetpy.schemas.events import EVENT_SCHEMA
 
-@dataclass(frozen=True)
-class Field:
-    """One output column of a Chadwick tool, as Chadwick describes it."""
+        consolidated = pa.Table.from_batches([], schema=EVENT_SCHEMA)
+    else:
+        consolidated = pa.concat_tables(tables)
 
-    number: int
-    description: str
-    extended: bool  # True for the -x fields, False for the -f fields
-    default: bool  # printed by Chadwick when no field list is given (we print all regardless)
-
-
-def fields(name: str) -> list[Field]:
-    """The numbered fields of a table (what Chadwick's ``-d`` lists), in output order.
-
-    The numbers are what ``fields=`` and ``extended=`` take. Column *names* are on
-    ``table.columns``.
-    """
-    t = tool(name)
-    if not t.rows:
-        raise ValueError(f"{name} has no fields")
-    done = subprocess.run(  # noqa: S603 - fixed argv, no shell
-        [sys.executable, "-m", "chadwickpy", t.command, "-d"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,  # Chadwick prints the -d listing on stderr
-        check=False,
-    )
-    if done.returncode != 0:
-        raise ToolError(f"{t.command} -d failed: {done.stdout.decode('latin-1')[-300:]}")
-    out: list[Field] = []
-    extended = False
-    for line in done.stdout.decode("latin-1").splitlines():
-        if line.startswith("These additional fields"):
-            extended = True
-        parts = line.split(None, 1)
-        if len(parts) == 2 and parts[0].isdigit():
-            text = parts[1].rstrip()
-            default = text.endswith("*")
-            out.append(Field(int(parts[0]), text.rstrip("*").rstrip(), extended, default))
-    return out
+    return _convert_backend(consolidated, backend)
 
 
-__all__ = [
-    "TOOLS",
-    "Field",
-    "boxscores",
-    "comments",
-    "daily",
-    "events",
-    "fields",
-    "games",
-    "season",
-    "subs",
-]
+def game_logs(
+    year: int | Sequence[int],
+    backend: str = "arrow",
+    force: bool = False,
+    downloader: Downloader | None = None,
+) -> Any:
+    """Downloads, parses, and returns official game logs as a strongly-typed DataFrame or Arrow Table."""
+    dl = downloader or Downloader()
+    parser = GameLogParser()
+    year_list = _normalize_years(year)
+    tables: list[pa.Table] = []
+
+    for y in year_list:
+        extracted_dir = dl.get_gamelogs(y, force=force)
+        gl_files = list(extracted_dir.glob("gl*.txt"))
+        if gl_files:
+            tbl = parser.parse_files(gl_files)
+            tables.append(tbl)
+
+    if not tables:
+        from retrosheetpy.schemas.gamelogs import GAMELOG_SCHEMA
+
+        consolidated = pa.Table.from_batches([], schema=GAMELOG_SCHEMA)
+    else:
+        consolidated = pa.concat_tables(tables)
+
+    return _convert_backend(consolidated, backend)
+
+
+def rosters(
+    year: int | Sequence[int],
+    backend: str = "arrow",
+    force: bool = False,
+    downloader: Downloader | None = None,
+) -> Any:
+    """Downloads event archives to parse and return team rosters as a strongly-typed table."""
+    dl = downloader or Downloader()
+    parser = RosterParser()
+    year_list = _normalize_years(year)
+    tables: list[pa.Table] = []
+
+    for y in year_list:
+        extracted_dir = dl.get_events(y, force=force)
+        ros_files = list(extracted_dir.glob("*.ROS"))
+        if ros_files:
+            tbl = parser.parse_files(ros_files, year=y)
+            tables.append(tbl)
+
+    if not tables:
+        from retrosheetpy.schemas.rosters import ROSTER_SCHEMA
+
+        consolidated = pa.Table.from_batches([], schema=ROSTER_SCHEMA)
+    else:
+        consolidated = pa.concat_tables(tables)
+
+    return _convert_backend(consolidated, backend)
+
+
+def parks(
+    backend: str = "arrow",
+    force: bool = False,
+    downloader: Downloader | None = None,
+) -> Any:
+    """Downloads and returns the official ballpark encyclopedia table."""
+    dl = downloader or Downloader()
+    parser = ParkParser()
+    file_path = dl.get_parks(force=force)
+    table = parser.parse_file(file_path)
+    return _convert_backend(table, backend)
+
+
+def to_duckdb(
+    path: Path | str,
+    years: int | Sequence[int],
+    datasets: Sequence[str] = ("events", "gamelogs", "rosters", "parks"),
+    force: bool = False,
+    downloader: Downloader | None = None,
+) -> None:
+    """Ingests selected Retrosheet datasets into a DuckDB database."""
+    dl = downloader or Downloader()
+    sink = DuckDBSink(db_path=path)
+
+    try:
+        ds_set = set(d.lower() for d in datasets)
+
+        if "parks" in ds_set:
+            tbl_parks = parks(backend="arrow", force=force, downloader=dl)
+            sink.write_table("parks", tbl_parks)
+
+        if "gamelogs" in ds_set or "game_logs" in ds_set:
+            tbl_gl = game_logs(year=years, backend="arrow", force=force, downloader=dl)
+            sink.write_table("game_logs", tbl_gl)
+
+        if "rosters" in ds_set:
+            tbl_rosters = rosters(year=years, backend="arrow", force=force, downloader=dl)
+            sink.write_table("rosters", tbl_rosters)
+
+        if "events" in ds_set:
+            tbl_events = events(year=years, backend="arrow", force=force, downloader=dl)
+            sink.write_table("events", tbl_events)
+    finally:
+        sink.close()
+
+
+def to_parquet(
+    path: Path | str,
+    dataset: str,
+    years: int | Sequence[int] = 2024,
+    force: bool = False,
+    downloader: Downloader | None = None,
+) -> Path:
+    """Exports a specified dataset into a Parquet file."""
+    dl = downloader or Downloader()
+    sink = FileSink()
+    d = dataset.lower()
+
+    if d == "events":
+        tbl = events(year=years, backend="arrow", force=force, downloader=dl)
+    elif d in ("gamelogs", "game_logs"):
+        tbl = game_logs(year=years, backend="arrow", force=force, downloader=dl)
+    elif d == "rosters":
+        tbl = rosters(year=years, backend="arrow", force=force, downloader=dl)
+    elif d == "parks":
+        tbl = parks(backend="arrow", force=force, downloader=dl)
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset}")
+
+    return sink.write_parquet(path, tbl)
+
+
+def get_ddl(dataset: str, dialect: str = "postgres") -> str:
+    """Returns the SQL DDL CREATE TABLE statement for a given dataset and dialect."""
+    from retrosheetpy.schemas.ddl import generate_ddl
+
+    return generate_ddl(dataset, dialect=dialect)
+
+
+def to_dlt(
+    destination: str | Any,
+    years: int | Sequence[int],
+    datasets: Sequence[str] = ("events", "gamelogs", "rosters", "parks"),
+    pipeline_name: str = "retrosheet",
+    downloader: Downloader | None = None,
+    **dlt_kwargs: Any,
+) -> Any:
+    """Runs a full dlt pipeline ingesting Retrosheet datasets into Postgres, Snowflake, BigQuery, etc."""
+    try:
+        import dlt
+    except ImportError as err:
+        raise ImportError(
+            "dlt is not installed. Install it via 'pip install retrosheetpy[dlt]' or 'pip install dlt'."
+        ) from err
+
+    from retrosheetpy.sink.dlt_sink import retrosheet_source
+
+    pipeline = dlt.pipeline(pipeline_name=pipeline_name, destination=destination, **dlt_kwargs)
+    source = retrosheet_source(years=years, datasets=datasets, downloader=downloader)
+    return pipeline.run(source)

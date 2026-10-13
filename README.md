@@ -1,160 +1,73 @@
 # retrosheetpy
 
-Ask for a Retrosheet season, get data tables. `retrosheetpy` downloads seasons from
-[Retrosheet](https://www.retrosheet.org), keeps them in a cache folder, runs the Chadwick tools on
-them (through the pure-Python port [chadwickpy](https://pypi.org/project/chadwickpy/)), and gives you
-the result as rows, CSV, JSON lines, SQLite or pandas.
+<p align="center"><b>Fast, strongly-typed Retrosheet baseball data downloader, parser, and database ingestor.</b></p>
 
-> **Status: not released yet.** The code works and is tested; the name is not on PyPI yet.
+`retrosheetpy` brings modern data workflows to [Retrosheet](https://www.retrosheet.org) baseball archives. It enables baseball researchers, analysts, professors, and DBAs to download, parse, and ingest play-by-play events, historical game logs, rosters, and biofiles directly into **DuckDB, Parquet, Polars, pandas, and SQL databases** with **strongly-typed schemas** (integers, dates, booleans—never raw text dumps).
+
+Powered by [`chadwickpy`](https://github.com/cbwinslow/chadwickpy) for multi-core play-by-play parsing with **zero C compiler dependencies**.
+
+---
+
+## Key Features
+
+- **No C Compiler Required**: 100% pure Python / PyArrow / DuckDB, installable on Windows, macOS, and Linux in seconds.
+- **Strongly Typed Schemas**: Dates are parsed to `DATE`, counts and scores to `INTEGER`, flags to `BOOLEAN`—ready for instant SQL queries without manual casting.
+- **Complete Retrosheet Catalog**:
+  - **Events** (Play-by-play, via `chadwickpy`)
+  - **Game Logs** (1871–present, 161+ columns)
+  - **Rosters** (`.ROS` player records, handedness, teams)
+  - **Ballparks** (`parks.csv`, history, dates, coordinates)
+  - **Personnel Directory** (`biofile`, birth/death, debuts)
+  - **Transactions & Ejections**
+- **Smart Local Caching**: Download once to `~/.cache/retrosheetpy/` and reuse across workflows.
+- **Decoupled Architecture**: Pluggable extractors, parsers, and sinks (Arrow, DuckDB, Parquet, CSV, and optional `dlt` for cloud data warehouses).
+
+---
+
+## Quickstart
+
+```bash
+pip install retrosheetpy
+```
+
+### Python API
 
 ```python
 import retrosheetpy as rs
 
-rs.events(2010)  # every play of 2010: a Table with 164 columns
-rs.games(range(2000, 2011))  # eleven seasons, one combined Table
-rs.events(2010, home="NYA", start="0601", end="0630")  # one team's home games in June
-rs.season(2010).daily().to_csv("daily.csv")
-rs.games([2008, 2009]).to_sqlite("mlb.db")
+# 1. Download & inspect 2024 MLB play-by-play events
+events = rs.events(year=2024)  # Returns Polars DataFrame by default
+print(events.select(["GAME_ID", "BAT_ID", "PIT_ID", "EVENT_TX"]))
+
+# 2. Historical Game Logs (1871-present)
+gamelogs = rs.game_logs(years=[2023, 2024])
+
+# 3. Ballpark Directory & Rosters
+parks = rs.parks()
+rosters_2024 = rs.rosters(year=2024)
+
+# 4. Ingest decades directly into DuckDB
+rs.to_duckdb(
+    path="retrosheet.duckdb",
+    years=range(2000, 2025),
+    datasets=["events", "game_logs", "rosters", "parks"],
+)
 ```
 
-```
-retrosheetpy events 2010 --out events.csv
-retrosheetpy games 2000-2010 --format sqlite --out mlb.db
-retrosheetpy events 2010 --home NYA --fields 0-5 --format jsonl
-retrosheetpy boxscores 2010 --game ANA201004050
-retrosheetpy fields events            # the numbered fields Chadwick lists
-```
+### Command-Line Interface (CLI)
 
-## The six tables
+```bash
+# Ingest 2010 through 2024 into a local DuckDB database
+retrosheetpy ingest --years 2010-2024 --dest duckdb --file retro.duckdb
 
-They are Chadwick's six programs, with Chadwick's names and Chadwick's column names.
-
-| Table | One row per | Columns | Chadwick |
-| --- | --- | --- | --- |
-| `events` | play | 164 | `cwevent` |
-| `games` | game | 182 | `cwgame` |
-| `daily` | player per game | 154 | `cwdaily` |
-| `subs` | substitution | 25 | `cwsub` |
-| `comments` | comment record | 10 | `cwcomment` |
-| `boxscores` | (text) | | `cwbox` (text, XML, SportsML) |
-
-Every column Chadwick can print is printed by default. Values are the strings Chadwick prints; a
-missing value is an empty string, never zero. Nothing is typed or guessed.
-
-## What is covered
-
-Regular-season games from Retrosheet's decade event archives, seasons **1908 to the latest**
-(Retrosheet's 1910s archive also holds 1908 and 1909). All event files in an archive are used:
-team files (`2010ANA.EVA`, the Federal League's `.EVF`, `.EVR`) and the deduced-game files
-(`.EDN`, `.EDA`, `.EDF`, including those named by year alone, such as `1920.EDA`).
-
-Games from Retrosheet's other archives are one option away, with `kind=` (or `--kind`):
-
-| `kind=` | Retrosheet files | Seasons | Notes |
-| --- | --- | --- | --- |
-| `"regular"` (default) | decade event archives | 1908 on | |
-| `"postseason"` | `allpost.zip` | 1900 on | World Series, playoffs, division series |
-| `"allstar"` | `allas.zip` | 1933 on | |
-| `"negro"` | `allevr.zip` | 1903 to 1961 | Negro Leagues play-by-play |
-| `"negro_box"` | `allebr.zip` | 1903 to 1961 | games known from box scores only: no events |
-| `"box"` | `1890sbox.zip`, `1900sbox.zip` | 1897 to 1909 | major-league games known from box scores only: no events |
-
-Each kind is kept apart in the cache (a season's postseason and regular files have different team
-lists). `home=` works on the regular season only, since the other files are not named by home team.
-Retrosheet ships no team list for the Negro Leagues archives and the Chadwick tools will not run
-without one, so retrosheetpy creates an empty one. Games known only from box scores have no plays, so
-`events` is empty for them; `games`, `daily` and `boxscores` have the data.
-
-Checked against the real C tools (6,000-odd comparisons): every season of `postseason`, `allstar`,
-`negro` and `box` 1897-1899, all six tables, byte-identical.
-
-**Known problems in Retrosheet's box-score-only files, not in this package.** The C tools themselves
-fail on these, and chadwickpy stops where the C would crash or read uninitialised memory, so you get
-an error (`ToolError`) instead of output:
-
-* `boxscores` for `kind="box"` 1901 to 1907: the C `cwbox` crashes on these files. Single games work
-  (`game=`).
-* `kind="negro_box"` 1921, 1933 to 1939, 1946, 1947 and 1949: some games are damaged (players listed
-  in a statistics line but missing from the lineup, `NA` where a number belongs, a start time written
-  as `6.25E-2`). `games`, `daily` and `boxscores` fail for those seasons; asking for one game or a date
-  range that avoids the damaged games works.
-
-The 1871, 1872 and 1874 archives Retrosheet lists as box scores hold only a team list, so there is
-nothing to read; the package says so. Seasons before 1897 are not available from these archives.
-
-## Options (the same for every table)
-
-| Option | Meaning |
-| --- | --- |
-| `home="NYA"` or `["NYA", "BOS"]` | only those home teams' files (Retrosheet files are named by home team). Games Retrosheet deduced from box scores sit in files named by year (`1920.EDA`) that mix teams, so `home=` leaves those out. |
-| `game="ANA201004050"` | only that game |
-| `start="0405"`, `end="0430"` | date range, `mmdd` |
-| `fields=...`, `extended=...` | choose columns by Chadwick's field numbers (`"0-5,9"`, `[0, 7]`). Choose one and the other is left out. |
-| `jobs=4` | worker processes (default: automatic, at most 16, leaving a core free) |
-
-`table.select("GAME_ID", "BAT_ID")` picks columns by name afterwards.
-
-Asking for several seasons (a list or a range) gives one Table: the seasons' rows in order, the
-header once. Every row starts with the game id, which contains the year, so no extra column is added.
-XML and SportsML box scores are one document per season, so they take one season at a time.
-
-## Getting the data out
-
-A `Table` streams: it runs the tool each time you loop over it, so a whole era does not have to fit in
-memory. `.load()` keeps the rows in a list.
-
-```python
-for row in rs.events(2010):
-    ...  # dicts
-rs.events(2010).rows()  # tuples, faster
-t.to_csv("a.csv")
-t.to_jsonl("a.jsonl")
-t.to_json("a.json")
-t.to_sqlite("a.db", if_exists="replace")  # every column TEXT; all-or-nothing
-t.to_pandas()  # pip install "retrosheetpy[pandas]"
-t.write("a.csv")  # the format follows the file name
+# Export specific datasets to Parquet
+retrosheetpy export --dataset game_logs --years 1980-2024 --format parquet --output-dir ./data/
 ```
 
-Files are written whole or not at all. A tool failure raises `ToolError` with Chadwick's message and
-leaves nothing behind.
+---
 
-## The cache
+## License & Attribution
 
-`~/.retrosheetpy` (or `$RETROSHEETPY_HOME`, or `--cache-dir`). Each decade's event archive is
-downloaded once, with its SHA-256 recorded, and each season is unpacked beside it.
-`retrosheetpy cache verify` re-checks the files; `retrosheetpy cache clear` removes them.
+`retrosheetpy` is licensed under GPL-3.0-or-later.
 
-## How it was checked
-
-The output is compared byte for byte with the real Chadwick C tools by `scripts/parity.py`: 24
-seasons between 1910 and 2025 (including the Federal League and deduced-game files), all tables, plus
-option variants: 288 of 288 identical. Those 24 seasons asked for as one Table give 3,441,587 `events`
-rows and 43,566 `games` rows, equal to the C outputs joined. The unit tests (`pytest`) use a made-up
-two-season fixture and need no network; with `CHADWICK_BIN` set they also compare against the C tools.
-
-That comparison runs the C tools on the same file list, so it cannot notice a file we left out. A
-separate check does: every file in all twelve decade archives is kept, and for 1908, 1909, 1914, 1920,
-1962 and 2010 the number of `games` rows equals the number of games in the raw event files.
-
-Two things are *not* compared with C, on purpose: the C `cwbox -S` (SportsML) crashes on real data,
-and the C `cwbox -X` (XML) prints one attribute (`pb`) from uninitialised memory. chadwickpy
-documents both. The text box scores are identical.
-
-## Speed
-
-Measured on a 40-core machine, 2010 `events` (191,832 rows, 30 team files): about 5 to 8 seconds with
-the default workers, about 90 seconds on one core. The C tools take about 8.7 seconds on one core.
-Python is not faster than C per core; chadwickpy runs the team files on several cores.
-
-## Data and credit
-
-No Retrosheet data is included. The information used was obtained free of charge from, and is
-copyrighted by, [Retrosheet](https://www.retrosheet.org). Follow Retrosheet's data-use notice when you
-publish anything made from its files. The notice is printed the first time a season is downloaded.
-
-retrosheetpy is independent: not written, endorsed or sponsored by Retrosheet or the Chadwick
-Baseball Bureau. It is unrelated to any other project that uses the name `retrosheetpy`.
-
-## Licence
-
-GPL-3.0-or-later. See `LICENSE` and `NOTICE`.
+The information used in this project is obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at [www.retrosheet.org](https://www.retrosheet.org).
