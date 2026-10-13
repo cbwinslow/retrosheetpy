@@ -6,11 +6,38 @@ import click
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from retrosheetpy.api import (
+    allstar,
+    bio,
+    ejections,
+    game_logs,
+    parks,
+    postseason,
+    rosters,
+    schedules,
+    to_dlt,
+    to_duckdb,
+    to_parquet,
+    transactions,
+)
 from retrosheetpy.api import download as api_download
-from retrosheetpy.api import game_logs, parks, rosters, to_duckdb, to_parquet
 from retrosheetpy.extract.cache import CacheManager
 
 console = Console()
+
+DATASET_CHOICES = [
+    "events",
+    "postseason",
+    "allstar",
+    "gamelogs",
+    "rosters",
+    "parks",
+    "schedules",
+    "bio",
+    "ejections",
+    "transactions",
+    "all",
+]
 
 
 def _parse_years_arg(years_str: str) -> list[int]:
@@ -37,9 +64,9 @@ def main() -> None:
 @click.option(
     "--dataset",
     "-s",
-    type=click.Choice(["events", "gamelogs", "rosters", "parks", "schedules", "bio", "all"]),
+    type=click.Choice(DATASET_CHOICES),
     default="all",
-    help="Dataset to download (events, gamelogs, rosters, parks, schedules, bio, or all)",
+    help="Dataset to download (events, gamelogs, schedules, bio, ejections, transactions, etc.)",
 )
 @click.option(
     "--years",
@@ -62,62 +89,56 @@ def download(dataset: str, years: str | None, force: bool) -> None:
         progress.update(task, completed=True)
 
     for ds, paths in results.items():
-        console.print(f"[bold green]✓ {ds}:[/bold green] {len(paths)} archive(s) ready in cache")
+        console.print(f"[bold green]✓ {ds}:[/bold green] {len(paths)} asset(s) ready in cache")
 
 
 @main.command()
-@click.option(
-    "--dataset",
-    "-s",
-    type=click.Choice(["events", "gamelogs", "rosters", "parks"]),
-    required=True,
-    help="Dataset name",
-)
-@click.option(
-    "--dialect",
-    type=click.Choice(["postgres", "duckdb", "sqlite"]),
-    default="postgres",
-    help="Target SQL dialect",
-)
-def ddl(dataset: str, dialect: str) -> None:
-    """Print SQL DDL CREATE TABLE statement for a dataset."""
-    from retrosheetpy.api import get_ddl
-
-    sql = get_ddl(dataset, dialect=dialect)
-    console.print(sql)
-
-
-@main.command()
-@click.option(
-    "--years", "-y", required=True, help="Year or range of years (e.g. '2024' or '2020-2024')"
-)
 @click.option(
     "--dest",
     "-d",
-    type=click.Choice(["duckdb"]),
+    type=click.Choice(["duckdb", "postgres", "snowflake", "bigquery", "sqlite"]),
     default="duckdb",
-    help="Target destination database",
+    help="Target database destination (default: duckdb)",
 )
 @click.option(
-    "--file",
+    "--conn",
+    "-c",
     "-f",
-    "output_file",
+    "conn",
     required=True,
-    help="Output database file path (e.g. retrosheet.duckdb)",
+    help="Target connection URI or file path (e.g. 'baseball.duckdb' or 'postgresql://...')",
 )
 @click.option(
-    "--datasets",
+    "--dataset",
     "-s",
     default="events,gamelogs,rosters,parks",
-    help="Comma-separated datasets to ingest",
+    help="Comma-separated datasets to ingest, or 'all'",
+)
+@click.option(
+    "--years",
+    "-y",
+    default="2024",
+    help="Year or range of years (e.g. '2024' or '2020-2024')",
 )
 @click.option("--force", is_flag=True, help="Force re-download even if cached")
-def ingest(years: str, dest: str, output_file: str, datasets: str, force: bool) -> None:
-    """Ingest Retrosheet data into an embedded database (DuckDB)."""
+def ingest(dest: str, conn: str, dataset: str, years: str, force: bool) -> None:
+    """Ingest Retrosheet data into DuckDB or remote SQL warehouses (Postgres, Snowflake, etc.)."""
     year_list = _parse_years_arg(years)
-    dataset_list = [d.strip() for d in datasets.split(",")]
+    if dataset.lower() == "all":
+        dataset_list = [
+            "events",
+            "gamelogs",
+            "rosters",
+            "parks",
+            "schedules",
+            "bio",
+            "ejections",
+            "transactions",
+        ]
+    else:
+        dataset_list = [d.strip() for d in dataset.split(",")]
 
-    console.print(f"[bold green]Starting ingestion into {dest}:[/bold green] {output_file}")
+    console.print(f"[bold green]Starting ingestion into {dest}:[/bold green] {conn}")
     console.print(
         f"Years: {year_list[0]}–{year_list[-1]} ({len(year_list)} seasons), Datasets: {dataset_list}"
     )
@@ -126,25 +147,45 @@ def ingest(years: str, dest: str, output_file: str, datasets: str, force: bool) 
         SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True
     ) as progress:
         task = progress.add_task("Ingesting data...", total=None)
-        to_duckdb(
-            path=output_file,
-            years=year_list,
-            datasets=dataset_list,
-            force=force,
-        )
+        if dest == "duckdb":
+            to_duckdb(
+                path=conn,
+                years=year_list,
+                datasets=dataset_list,
+                force=force,
+            )
+        else:
+            try:
+                to_dlt(
+                    destination=dest,
+                    years=year_list,
+                    datasets=dataset_list,
+                    credentials=conn,
+                )
+            except ImportError:
+                progress.update(task, completed=True)
+                console.print(
+                    f"\n[bold red]Error: Destination '{dest}' requires dlt.[/bold red]\n"
+                    'Install warehouse support with: [bold cyan]pip install "retrosheetpy[dlt]"[/bold cyan]'
+                )
+                raise SystemExit(1) from None
         progress.update(task, completed=True)
 
-    console.print(f"[bold green]✓ Successfully ingested datasets into {output_file}[/bold green]")
+    console.print(f"[bold green]✓ Successfully ingested datasets into {conn}[/bold green]")
 
 
 @main.command()
 @click.option(
-    "--dataset", "-s", type=click.Choice(["events", "gamelogs", "rosters", "parks"]), required=True
+    "--dataset",
+    "-s",
+    type=click.Choice([d for d in DATASET_CHOICES if d != "all"]),
+    required=True,
+    help="Dataset name to export",
 )
 @click.option(
     "--years", "-y", default="2024", help="Year or range of years (e.g. '2024' or '2020-2024')"
 )
-@click.option("--format", "-fmt", type=click.Choice(["parquet", "csv"]), default="parquet")
+@click.option("--format", "-f", "-fmt", type=click.Choice(["parquet", "csv"]), default="parquet")
 @click.option("--output", "-o", required=True, help="Output file path (e.g. gamelogs_2024.parquet)")
 @click.option("--force", is_flag=True, help="Force re-download even if cached")
 def export(dataset: str, years: str, format: str, output: str, force: bool) -> None:
@@ -155,16 +196,28 @@ def export(dataset: str, years: str, format: str, output: str, force: bool) -> N
     if format == "parquet":
         to_parquet(path=output, dataset=dataset, years=year_list, force=force)
     else:
-        # CSV export
         from retrosheetpy.sink.file_sink import FileSink
 
         sink = FileSink()
-        if dataset == "parks":
+        d = dataset.lower()
+        if d == "parks":
             tbl = parks(backend="arrow", force=force)
-        elif dataset == "rosters":
+        elif d == "bio":
+            tbl = bio(backend="arrow", force=force)
+        elif d == "ejections":
+            tbl = ejections(backend="arrow", force=force)
+        elif d == "transactions":
+            tbl = transactions(backend="arrow", force=force)
+        elif d == "rosters":
             tbl = rosters(year=year_list, backend="arrow", force=force)
-        elif dataset in ("gamelogs", "game_logs"):
+        elif d == "schedules":
+            tbl = schedules(year=year_list, backend="arrow", force=force)
+        elif d in ("gamelogs", "game_logs"):
             tbl = game_logs(year=year_list, backend="arrow", force=force)
+        elif d == "postseason":
+            tbl = postseason(year=year_list, backend="arrow", force=force)
+        elif d == "allstar":
+            tbl = allstar(year=year_list, backend="arrow", force=force)
         else:
             from retrosheetpy.api import events
 
@@ -172,6 +225,28 @@ def export(dataset: str, years: str, format: str, output: str, force: bool) -> N
         sink.write_csv(output, tbl)
 
     console.print(f"[bold green]✓ Export complete: {output}[/bold green]")
+
+
+@main.command()
+@click.option(
+    "--dataset",
+    "-s",
+    type=click.Choice([d for d in DATASET_CHOICES if d != "all"]),
+    required=True,
+    help="Dataset name",
+)
+@click.option(
+    "--dialect",
+    type=click.Choice(["postgres", "duckdb", "sqlite", "snowflake", "bigquery"]),
+    default="postgres",
+    help="Target SQL dialect",
+)
+def ddl(dataset: str, dialect: str) -> None:
+    """Print SQL DDL CREATE TABLE statement for a dataset."""
+    from retrosheetpy.api import get_ddl
+
+    sql = get_ddl(dataset, dialect=dialect)
+    console.print(sql)
 
 
 @main.command()

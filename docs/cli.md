@@ -1,6 +1,6 @@
 # Command-Line Interface (CLI)
 
-`retrosheetpy` provides a fast CLI tool for ingesting into DuckDB, exporting to Parquet/CSV, generating SQL DDL, and managing the local cache.
+`retrosheetpy` provides a lightning-fast CLI tool for downloading Retrosheet archives, ingesting into DuckDB or cloud warehouses, exporting to Parquet/CSV, generating production SQL DDL, and managing the local cache.
 
 ---
 
@@ -24,85 +24,104 @@ retrosheetpy download [OPTIONS]
 ```
 
 ### Options
-* `-s, --dataset [events|gamelogs|rosters|parks|schedules|bio|all]` *(Default: `all`)*: Dataset to download.
+* `-s, --dataset [events|postseason|allstar|gamelogs|rosters|parks|schedules|bio|ejections|transactions|all]` *(Default: `all`)*: Dataset to download.
 * `-y, --years TEXT` *(Optional)*: Year or range of years (e.g. `2024` or `2020-2024`).
 * `--force`: Force re-download even if already cached.
 
-### Example
+### Examples
 ```bash
 # Download and extract 2024 event files
-retrosheetpy download --dataset events --years 2024
+retrosheetpy download -s events -y 2024
 
 # Download all 2020-2024 archives into cache
-retrosheetpy download --dataset all --years 2020-2024
+retrosheetpy download -s all -y 2020-2024
+
+# Download reference files (parks, biofile, ejections, transactions)
+retrosheetpy download -s bio,parks,ejections,transactions
 ```
 
 ---
 
 ## `retrosheetpy ingest`
 
-Downloads and ingests specified seasons and datasets directly into an embedded DuckDB database file:
+Downloads and ingests specified seasons and datasets directly into an embedded DuckDB database file or a remote cloud data warehouse via `dlt`:
 
 ```bash
 retrosheetpy ingest [OPTIONS]
 ```
 
 ### Options
-* `-y, --years TEXT` *(Required)*: Year or range of years (e.g. `2024` or `2010-2024`).
-* `-f, --file PATH` *(Required)*: Output database file path (e.g. `retrosheet.duckdb`).
-* `-d, --dest [duckdb]` *(Default: `duckdb`)*: Destination database type.
-* `-s, --datasets TEXT` *(Default: `events,gamelogs,rosters,parks`)*: Comma-separated list of datasets to ingest.
+* `-d, --dest [duckdb|postgres|snowflake|bigquery|sqlite]` *(Default: `duckdb`)*: Destination database type.
+* `-c, -f, --conn PATH/URI` *(Required)*: Output file path (for DuckDB/SQLite) or warehouse connection URI (for Postgres, Snowflake, BigQuery).
+* `-s, --dataset TEXT` *(Default: `events,gamelogs,rosters,parks`)*: Comma-separated list of datasets to ingest, or `all`.
+* `-y, --years TEXT` *(Default: `2024`)*: Year or range of years (e.g. `2024` or `2010-2024`).
 * `--force`: Force re-download even if already present in local cache.
 
-### Example
+### Examples
 ```bash
-# Ingest 2020 through 2024 into retro.duckdb
-retrosheetpy ingest --years 2020-2024 --dest duckdb --file retro.duckdb
+# Ingest 2020 through 2024 into local DuckDB
+retrosheetpy ingest -d duckdb -c retro.duckdb -s events,gamelogs -y 2020-2024
+
+# Ingest all 2024 data into PostgreSQL warehouse (requires pip install "retrosheetpy[dlt]")
+retrosheetpy ingest -d postgres -c "postgresql://user:pass@localhost:5432/retrosheet" -s all -y 2024
+
+# Ingest into Snowflake
+retrosheetpy ingest -d snowflake -c "snowflake://..." -s gamelogs -y 2020-2024
 ```
 
 ---
 
 ## `retrosheetpy export`
 
-Exports a Retrosheet dataset to compressed Parquet or CSV format:
+Exports any Retrosheet dataset to compressed Parquet or CSV format:
 
 ```bash
 retrosheetpy export [OPTIONS]
 ```
 
 ### Options
-* `-s, --dataset [events|gamelogs|rosters|parks]` *(Required)*: Dataset to export.
+* `-s, --dataset [events|postseason|allstar|gamelogs|rosters|parks|schedules|bio|ejections|transactions]` *(Required)*: Dataset to export.
 * `-y, --years TEXT` *(Default: `2024`)*: Year or range of years (e.g. `2024` or `2000-2024`).
 * `-o, --output PATH` *(Required)*: Output file path (e.g. `gamelogs_2024.parquet`).
-* `-fmt, --format [parquet|csv]` *(Default: `parquet`)*: Output file format.
+* `-f, -fmt, --format [parquet|csv]` *(Default: `parquet`)*: Output file format.
 * `--force`: Force re-download even if already present in local cache.
 
-### Example
+### Examples
 ```bash
 # Export 2024 game logs to Parquet
-retrosheetpy export --dataset gamelogs --years 2024 --format parquet --output gl2024.parquet
+retrosheetpy export -s gamelogs -y 2024 -f parquet -o gl2024.parquet
 
-# Export 2024 rosters to CSV
-retrosheetpy export --dataset rosters --years 2024 --format csv --output rosters2024.csv
+# Export 2024 schedules to Parquet
+retrosheetpy export -s schedules -y 2024 -f parquet -o schedules_2024.parquet
+
+# Export biographical master file to CSV
+retrosheetpy export -s bio -f csv -o biofile.csv
 ```
 
 ---
 
 ## `retrosheetpy ddl`
 
-Generates and prints the standard SQL DDL `CREATE TABLE` statement for a dataset:
+Generates and prints the standard SQL DDL `CREATE TABLE` statement with strict native data types:
 
 ```bash
 retrosheetpy ddl [OPTIONS]
 ```
 
 ### Options
-* `-s, --dataset [events|gamelogs|rosters|parks]` *(Required)*: Dataset name.
-* `--dialect [postgres|duckdb|sqlite]` *(Default: `postgres`)*: Target database dialect.
+* `-s, --dataset [events|postseason|allstar|gamelogs|rosters|parks|schedules|bio|ejections|transactions]` *(Required)*: Dataset name.
+* `--dialect [postgres|duckdb|sqlite|snowflake|bigquery]` *(Default: `postgres`)*: Target database dialect.
 
-### Example
+### Examples
 ```bash
-retrosheetpy ddl --dataset gamelogs --dialect postgres
+# Generate PostgreSQL DDL for events
+retrosheetpy ddl -s events --dialect postgres
+
+# Generate BigQuery DDL for schedules
+retrosheetpy ddl -s schedules --dialect bigquery
+
+# Generate Snowflake DDL for biofile
+retrosheetpy ddl -s bio --dialect snowflake
 ```
 
 ---
@@ -119,7 +138,7 @@ retrosheetpy cache [OPTIONS]
 * `--clear`: Evict and clear all cached archives and decompressed files.
 * *(no options)*: Prints cache directory location and total disk usage.
 
-### Example
+### Examples
 ```bash
 # Inspect cache
 retrosheetpy cache
