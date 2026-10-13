@@ -1,0 +1,107 @@
+site_name: retrosheetpy
+site_description: Fast, modular, and strongly-typed Retrosheet baseball data downloader, parser, and database ingestor.
+site_author: C. B. Winslow
+site_url: https://cbwinslow.github.io/retrosheetpy/
+repo_url: https://github.com/cbwinslow/retrosheetpy
+repo_name: cbwinslow/retrosheetpy
+edit_uri: blob/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Slate / Dark mode by default (matches modern sabermetric & data tools)
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+    # Crisp Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+  - def_list
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+  - minify:
+      minify_html: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - 5-Minute Quickstart: getting-started/quickstart.md
+      - Architecture & Philosophy: getting-started/architecture.md
+      - Architecture Decisions (ADRs): DECISIONS.md
+  - Datasets & Schemas:
+      - Play-by-Play Events: datasets/events.md
+      - Historical Game Logs: datasets/gamelogs.md
+      - Team Rosters: datasets/rosters.md
+      - Ballpark Directory: datasets/parks.md
+  - Storage & Ingestion:
+      - DuckDB Integration: storage/duckdb.md
+      - Parquet & PyArrow: storage/parquet-arrow.md
+      - SQL DDL Generator: storage/sql-ddl.md
+      - Cloud Warehouses via dlt: storage/dlt-pipelines.md
+  - Sabermetric Cookbook:
+      - Run Expectancy (RE24): cookbook/run-expectancy.md
+      - Park Factor Analysis: cookbook/park-factors.md
+      - Platoon Splits: cookbook/platoon-splits.md
+      - Production Pipelines: cookbook/production-pipelines.md
+  - CLI Reference: cli.md
+  - API Reference: api.md
