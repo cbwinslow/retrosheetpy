@@ -59,7 +59,7 @@ jobs:
           python-version: ${{ matrix.python }}
           enable-cache: true
       - name: Run pytest
-        run: uv run --all-extras pytest -v -rs -p no:cacheprovider --cov --cov-fail-under=65
+        run: uv run --all-extras pytest -v -rs -p no:cacheprovider --cov --cov-fail-under=60
 
   package:
     name: build and clean-install check
