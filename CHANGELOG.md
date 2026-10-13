@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.0](https://github.com/cbwinslow/retrosheetpy/compare/v2.0.0...v2.1.0) (2026-10-13)
+
+
+### Features
+
+* **catalog:** expand full Retrosheet catalog, compact CLI flags, and warehouse ingestion ([#30](https://github.com/cbwinslow/retrosheetpy/issues/30)) ([bdcc471](https://github.com/cbwinslow/retrosheetpy/commit/bdcc471a3083c9aec9381410ead09414220e7277))
+* **cli:** add download command and api.download function ([#28](https://github.com/cbwinslow/retrosheetpy/issues/28)) ([bf139bb](https://github.com/cbwinslow/retrosheetpy/commit/bf139bb8ead99f3dca74cd75d14be208bea48cbd))
+
+
+### Bug Fixes
+
+* **catalog:** address bot review comments on atomicity, schemas, dlt idempotency, and test rigor ([#32](https://github.com/cbwinslow/retrosheetpy/issues/32)) ([2066c47](https://github.com/cbwinslow/retrosheetpy/commit/2066c47b27561a729f762cf45ed4f30b999d6075))
+
 ## [2.0.0](https://github.com/cbwinslow/retrosheetpy/compare/v1.1.0...v2.0.0) (2026-10-13)
 
 
