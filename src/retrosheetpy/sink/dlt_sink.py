@@ -49,7 +49,11 @@ def retrosheet_source(
 
         if "bio" in selected_datasets:
 
-            @dlt.resource(name="biographical", write_disposition="replace")
+            @dlt.resource(
+                name="biographical",
+                write_disposition="merge",
+                primary_key="player_id",
+            )
             def _bio_resource() -> Iterator[dict[str, Any]]:
                 parser = BioParser()
                 path = dl.get_bio()
@@ -73,7 +77,11 @@ def retrosheet_source(
 
         if "transactions" in selected_datasets:
 
-            @dlt.resource(name="transactions", write_disposition="replace")
+            @dlt.resource(
+                name="transactions",
+                write_disposition="merge",
+                primary_key="transaction_id",
+            )
             def _transactions_resource() -> Iterator[dict[str, Any]]:
                 parser = TransactionParser()
                 path = dl.get_transactions()
@@ -85,7 +93,11 @@ def retrosheet_source(
 
         if "schedules" in selected_datasets:
 
-            @dlt.resource(name="schedules", write_disposition="append")
+            @dlt.resource(
+                name="schedules",
+                write_disposition="merge",
+                primary_key="game_id",
+            )
             def _schedules_resource() -> Iterator[dict[str, Any]]:
                 parser = ScheduleParser()
                 for y in year_list:
@@ -104,7 +116,11 @@ def retrosheet_source(
 
         if "gamelogs" in selected_datasets or "game_logs" in selected_datasets:
 
-            @dlt.resource(name="game_logs", write_disposition="append")
+            @dlt.resource(
+                name="game_logs",
+                write_disposition="merge",
+                primary_key="game_id",
+            )
             def _gamelogs_resource() -> Iterator[dict[str, Any]]:
                 parser = GameLogParser()
                 for y in year_list:
@@ -118,7 +134,11 @@ def retrosheet_source(
 
         if "rosters" in selected_datasets:
 
-            @dlt.resource(name="rosters", write_disposition="append")
+            @dlt.resource(
+                name="rosters",
+                write_disposition="merge",
+                primary_key=["year", "team", "player_id"],
+            )
             def _rosters_resource() -> Iterator[dict[str, Any]]:
                 parser = RosterParser()
                 for y in year_list:
@@ -132,7 +152,11 @@ def retrosheet_source(
 
         if "events" in selected_datasets:
 
-            @dlt.resource(name="events", write_disposition="append")
+            @dlt.resource(
+                name="events",
+                write_disposition="merge",
+                primary_key=["game_id", "event_id"],
+            )
             def _events_resource() -> Iterator[dict[str, Any]]:
                 parser = EventParser()
                 for y in year_list:
@@ -147,7 +171,11 @@ def retrosheet_source(
 
         if "postseason" in selected_datasets:
 
-            @dlt.resource(name="postseason_events", write_disposition="append")
+            @dlt.resource(
+                name="postseason_events",
+                write_disposition="merge",
+                primary_key=["game_id", "event_id"],
+            )
             def _postseason_resource() -> Iterator[dict[str, Any]]:
                 parser = EventParser()
                 for y in year_list:
@@ -164,7 +192,11 @@ def retrosheet_source(
 
         if "allstar" in selected_datasets:
 
-            @dlt.resource(name="allstar_events", write_disposition="append")
+            @dlt.resource(
+                name="allstar_events",
+                write_disposition="merge",
+                primary_key=["game_id", "event_id"],
+            )
             def _allstar_resource() -> Iterator[dict[str, Any]]:
                 parser = EventParser()
                 for y in year_list:

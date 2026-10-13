@@ -40,7 +40,12 @@ class EjectionParser:
                         "job": row_dict.get("job") or None,
                         "umpire_id": row_dict.get("umpire") or None,
                         "umpire_name": row_dict.get("umpirename") or None,
-                        "inning": parse_int(row_dict.get("inning")),
+                        "inning": (
+                            parse_int(row_dict.get("inning"), default=-1)
+                            if row_dict.get("inning") is not None
+                            and str(row_dict.get("inning")).strip() != ""
+                            else -1
+                        ),
                         "reason": row_dict.get("reason") or None,
                     }
                 )

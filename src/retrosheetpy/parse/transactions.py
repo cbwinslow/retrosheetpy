@@ -30,6 +30,8 @@ class TransactionParser:
                 sec_date = parse_date(row[3]) if len(row) > 3 else None
                 approx_sec = row[4].strip() if len(row) > 4 and row[4].strip() else None
                 tran_id = row[5].strip() if len(row) > 5 else ""
+                if not tran_id:
+                    continue
                 player_id = row[6].strip() if len(row) > 6 else ""
                 tran_type = row[7].strip() if len(row) > 7 and row[7].strip() else None
                 from_team = row[8].strip() if len(row) > 8 and row[8].strip() else None

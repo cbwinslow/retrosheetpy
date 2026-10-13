@@ -111,17 +111,27 @@ def test_parse_transactions(tmp_path: Path) -> None:
 
 
 def test_parse_events_via_chadwick(tmp_path: Path) -> None:
-    fixture_dir = Path("C:/Users/blain/projects/chadwickpy/tests/fixtures/events")
-    roster_dir = Path("C:/Users/blain/projects/chadwickpy/tests/reference/rosters/regular_2007")
+    fake_eva = (
+        b"id,BOS202404010\n"
+        b"info,date,2024/04/01\n"
+        b"info,hometeam,BOS\n"
+        b"info,visteam,BAL\n"
+        b"start,play01,Batter One,0,1,4\n"
+        b"start,pitch01,Pitcher One,1,1,1\n"
+        b"play,1,0,play01,00,,S\n"
+        b"data,er,pitch01,0\n"
+    )
+    target_eva = tmp_path / "2024BOS.EVA"
+    target_eva.write_bytes(fake_eva)
 
-    if fixture_dir.exists() and roster_dir.exists():
-        for r in roster_dir.iterdir():
-            (tmp_path / r.name).write_bytes(r.read_bytes())
-        eva_files = list(fixture_dir.glob("*.EVA"))
-        if eva_files:
-            target_eva = tmp_path / eva_files[0].name
-            target_eva.write_bytes(eva_files[0].read_bytes())
-            parser = EventParser()
-            table = parser.parse_files([target_eva], year=2007)
-            assert isinstance(table, pa.Table)
-            assert table.num_rows > 0
+    parser = EventParser()
+    table = parser.parse_files([target_eva], year=2024)
+
+    assert isinstance(table, pa.Table)
+    assert table.num_rows == 1
+    assert table["GAME_ID"].to_pylist() == ["BOS202404010"]
+    assert table["INN_CT"].to_pylist() == [1]
+    assert table["EVENT_CD"].to_pylist() == [20]  # Single (S) -> EVENT_CD 20
+    assert pa.types.is_string(table.schema.field("GAME_ID").type)
+    assert pa.types.is_int16(table.schema.field("INN_CT").type)
+    assert pa.types.is_int16(table.schema.field("EVENT_CD").type)
