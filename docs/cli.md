@@ -15,6 +15,30 @@ retrosheetpy [OPTIONS] COMMAND [ARGS]...
 
 ---
 
+## `retrosheetpy download`
+
+Downloads and caches specified Retrosheet archives locally without loading them into memory or writing to an external database:
+
+```bash
+retrosheetpy download [OPTIONS]
+```
+
+### Options
+* `-s, --dataset [events|gamelogs|rosters|parks|schedules|bio|all]` *(Default: `all`)*: Dataset to download.
+* `-y, --years TEXT` *(Optional)*: Year or range of years (e.g. `2024` or `2020-2024`).
+* `--force`: Force re-download even if already cached.
+
+### Example
+```bash
+# Download and extract 2024 event files
+retrosheetpy download --dataset events --years 2024
+
+# Download all 2020-2024 archives into cache
+retrosheetpy download --dataset all --years 2020-2024
+```
+
+---
+
 ## `retrosheetpy ingest`
 
 Downloads and ingests specified seasons and datasets directly into an embedded DuckDB database file:

@@ -2,6 +2,7 @@
 
 from retrosheetpy._meta import __version__
 from retrosheetpy.api import (
+    download,
     events,
     game_logs,
     get_ddl,
@@ -14,6 +15,7 @@ from retrosheetpy.api import (
 
 __all__ = [
     "__version__",
+    "download",
     "events",
     "game_logs",
     "get_ddl",

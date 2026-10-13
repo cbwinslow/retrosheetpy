@@ -59,3 +59,21 @@ def test_cli_export(tmp_path: Path, monkeypatch) -> None:
     )
     assert result.exit_code == 0
     assert out_file.exists()
+
+
+def test_cli_download(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("RETROSHEETPY_CACHE_DIR", str(tmp_path))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("gl2024.txt", "dummy\n")
+    fake_zip = buf.getvalue()
+
+    monkeypatch.setattr(Downloader, "_fetch_bytes", lambda self, url: fake_zip)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        ["download", "--dataset", "gamelogs", "--years", "2024"],
+    )
+    assert result.exit_code == 0
+    assert "gamelogs" in result.output

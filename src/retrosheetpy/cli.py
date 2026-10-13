@@ -6,6 +6,7 @@ import click
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from retrosheetpy.api import download as api_download
 from retrosheetpy.api import game_logs, parks, rosters, to_duckdb, to_parquet
 from retrosheetpy.extract.cache import CacheManager
 
@@ -30,6 +31,38 @@ def _parse_years_arg(years_str: str) -> list[int]:
 def main() -> None:
     """retrosheetpy - Fast, strongly-typed Retrosheet downloader and database ingestor."""
     pass
+
+
+@main.command()
+@click.option(
+    "--dataset",
+    "-s",
+    type=click.Choice(["events", "gamelogs", "rosters", "parks", "schedules", "bio", "all"]),
+    default="all",
+    help="Dataset to download (events, gamelogs, rosters, parks, schedules, bio, or all)",
+)
+@click.option(
+    "--years",
+    "-y",
+    default=None,
+    help="Year or range of years (e.g. '2024' or '2020-2024')",
+)
+@click.option("--force", is_flag=True, help="Force re-download even if already cached")
+def download(dataset: str, years: str | None, force: bool) -> None:
+    """Download and cache Retrosheet archives locally."""
+    year_list = _parse_years_arg(years) if years else None
+    display_years = f" ({years})" if years else ""
+    console.print(f"[bold blue]Downloading {dataset}{display_years}...[/bold blue]")
+
+    with Progress(
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True
+    ) as progress:
+        task = progress.add_task("Downloading...", total=None)
+        results = api_download(years=year_list, datasets=dataset, force=force)
+        progress.update(task, completed=True)
+
+    for ds, paths in results.items():
+        console.print(f"[bold green]✓ {ds}:[/bold green] {len(paths)} archive(s) ready in cache")
 
 
 @main.command()
