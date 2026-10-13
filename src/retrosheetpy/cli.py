@@ -1,196 +1,159 @@
-"""Command-line entry point. Parses arguments and calls the API; no logic of its own."""
+"""Command-line interface for retrosheetpy."""
 
-import argparse
-import contextlib
-import io
-import os
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-import retrosheetpy as rs
-from retrosheetpy._meta import __version__
-from retrosheetpy.api import Years
-from retrosheetpy.errors import RetrosheetError
-from retrosheetpy.kinds import Kind
-from retrosheetpy.options import Opts
-from retrosheetpy.tools import TOOLS
+import click
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
-KIND_HELP = (
-    "which Retrosheet files: regular (default), postseason, allstar, negro, negro_box (games known "
-    "from box scores only), box (1897-1909 box-score-only games)"
+from retrosheetpy.api import game_logs, parks, rosters, to_duckdb, to_parquet
+from retrosheetpy.extract.cache import CacheManager
+
+console = Console()
+
+
+def _parse_years_arg(years_str: str) -> list[int]:
+    """Parses year strings like '2020-2024' or '2021,2022,2023' into a list of integers."""
+    result: set[int] = set()
+    for part in years_str.split(","):
+        part = part.strip()
+        if "-" in part:
+            start_s, end_s = part.split("-", 1)
+            result.update(range(int(start_s), int(end_s) + 1))
+        elif part.isdigit():
+            result.add(int(part))
+    return sorted(list(result))
+
+
+@click.group(name="retrosheetpy")
+@click.version_option(package_name="retrosheetpy")
+def main() -> None:
+    """retrosheetpy - Fast, strongly-typed Retrosheet downloader and database ingestor."""
+    pass
+
+
+@main.command()
+@click.option(
+    "--dataset",
+    "-s",
+    type=click.Choice(["events", "gamelogs", "rosters", "parks"]),
+    required=True,
+    help="Dataset name",
 )
-TABLE_FORMATS = ("csv", "jsonl", "json", "sqlite")
-BOX_FORMATS = ("text", "xml", "sportsml")
-_EXT = {"csv": "csv", "jsonl": "jsonl", "json": "json", "sqlite": "sqlite", "text": "txt",
-        "xml": "xml", "sportsml": "xml"}  # fmt: skip
+@click.option(
+    "--dialect",
+    type=click.Choice(["postgres", "duckdb", "sqlite"]),
+    default="postgres",
+    help="Target SQL dialect",
+)
+def ddl(dataset: str, dialect: str) -> None:
+    """Print SQL DDL CREATE TABLE statement for a dataset."""
+    from retrosheetpy.api import get_ddl
+
+    sql = get_ddl(dataset, dialect=dialect)
+    console.print(sql)
 
 
-def parse_years(tokens: list[str]) -> list[int]:
-    """``2010``, ``2000-2010`` and ``2001,2005`` (any mix) -> a list of seasons, in order."""
-    years: list[int] = []
-    for token in tokens:
-        for part in token.split(","):
-            lo, dash, hi = part.partition("-")
-            try:
-                a, b = int(lo), int(hi) if dash else int(lo)
-            except ValueError:
-                raise ValueError(
-                    f"cannot read {part!r} as a year or a range like 2000-2010"
-                ) from None
-            if b < a:
-                raise ValueError(f"{part!r} is backwards")
-            years += range(a, b + 1)
-    return years
+@main.command()
+@click.option(
+    "--years", "-y", required=True, help="Year or range of years (e.g. '2024' or '2020-2024')"
+)
+@click.option(
+    "--dest",
+    "-d",
+    type=click.Choice(["duckdb"]),
+    default="duckdb",
+    help="Target destination database",
+)
+@click.option(
+    "--file",
+    "-f",
+    "output_file",
+    required=True,
+    help="Output database file path (e.g. retrosheet.duckdb)",
+)
+@click.option(
+    "--datasets",
+    "-s",
+    default="events,gamelogs,rosters,parks",
+    help="Comma-separated datasets to ingest",
+)
+@click.option("--force", is_flag=True, help="Force re-download even if cached")
+def ingest(years: str, dest: str, output_file: str, datasets: str, force: bool) -> None:
+    """Ingest Retrosheet data into an embedded database (DuckDB)."""
+    year_list = _parse_years_arg(years)
+    dataset_list = [d.strip() for d in datasets.split(",")]
 
-
-def _label(years: list[int]) -> str:
-    return str(years[0]) if len(years) == 1 else f"{years[0]}-{years[-1]}"
-
-
-def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="retrosheetpy",
-        description="Download Retrosheet seasons and turn them into tables.",
+    console.print(f"[bold green]Starting ingestion into {dest}:[/bold green] {output_file}")
+    console.print(
+        f"Years: {year_list[0]}–{year_list[-1]} ({len(year_list)} seasons), Datasets: {dataset_list}"
     )
-    p.add_argument("-V", "--version", action="store_true", help="print the version and exit")
-    p.add_argument(
-        "--cache-dir", help="cache folder (default: $RETROSHEETPY_HOME or ~/.retrosheetpy)"
-    )
-    sub = p.add_subparsers(dest="command")
 
-    g = sub.add_parser("get", help="download and unpack seasons into the cache")
-    g.add_argument("years", nargs="+", metavar="YEARS", help="2010, 2000-2010, 2001,2005")
-    g.add_argument("--force", action="store_true", help="download again even if cached")
-    g.add_argument("--kind", choices=[k.value for k in Kind], default="regular", help=KIND_HELP)
+    with Progress(
+        SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True
+    ) as progress:
+        task = progress.add_task("Ingesting data...", total=None)
+        to_duckdb(
+            path=output_file,
+            years=year_list,
+            datasets=dataset_list,
+            force=force,
+        )
+        progress.update(task, completed=True)
 
-    for name, t in TOOLS.items():
-        q = sub.add_parser(name, help=f"{t.command} over seasons (downloads them if needed)")
-        q.add_argument("years", nargs="+", metavar="YEARS", help="2010, 2000-2010, 2001,2005")
-        q.add_argument("--kind", choices=[k.value for k in Kind], default="regular", help=KIND_HELP)
-        q.add_argument("--home", help="only these home teams' files, e.g. NYA or NYA,BOS")
-        q.add_argument("--game", help="only this game id, e.g. ANA201004050")
-        q.add_argument("--start", help="earliest date, mmdd")
-        q.add_argument("--end", help="latest date, mmdd")
-        q.add_argument("-j", "--jobs", type=int, help="worker processes (default: automatic)")
-        if t.rows:
-            q.add_argument("--fields", help="field numbers to print, e.g. 0-5,9 (see: fields)")
-            if t.max_ext_field is not None:
-                q.add_argument("--extended", help="extended field numbers, e.g. 0-10")
-            q.add_argument("--format", choices=TABLE_FORMATS, default="csv")
-            q.add_argument("--table", help="SQLite table name (default: the table's name)")
-            q.add_argument("--if-exists", choices=["fail", "replace", "append"], default="fail")
+    console.print(f"[bold green]✓ Successfully ingested datasets into {output_file}[/bold green]")
+
+
+@main.command()
+@click.option(
+    "--dataset", "-s", type=click.Choice(["events", "gamelogs", "rosters", "parks"]), required=True
+)
+@click.option(
+    "--years", "-y", default="2024", help="Year or range of years (e.g. '2024' or '2020-2024')"
+)
+@click.option("--format", "-fmt", type=click.Choice(["parquet", "csv"]), default="parquet")
+@click.option("--output", "-o", required=True, help="Output file path (e.g. gamelogs_2024.parquet)")
+@click.option("--force", is_flag=True, help="Force re-download even if cached")
+def export(dataset: str, years: str, format: str, output: str, force: bool) -> None:
+    """Export Retrosheet data to Parquet or CSV format."""
+    year_list = _parse_years_arg(years)
+    console.print(f"[bold blue]Exporting {dataset} ({years}) to {output} ({format})...[/bold blue]")
+
+    if format == "parquet":
+        to_parquet(path=output, dataset=dataset, years=year_list, force=force)
+    else:
+        # CSV export
+        from retrosheetpy.sink.file_sink import FileSink
+
+        sink = FileSink()
+        if dataset == "parks":
+            tbl = parks(backend="arrow", force=force)
+        elif dataset == "rosters":
+            tbl = rosters(year=year_list, backend="arrow", force=force)
+        elif dataset in ("gamelogs", "game_logs"):
+            tbl = game_logs(year=year_list, backend="arrow", force=force)
         else:
-            q.add_argument("--format", choices=BOX_FORMATS, default="text")
-        q.add_argument("--out", help="file or folder to write (default: print to stdout)")
+            from retrosheetpy.api import events
 
-    f = sub.add_parser("fields", help="list a table's numbered fields (Chadwick's -d)")
-    f.add_argument("table", choices=[n for n, t in TOOLS.items() if t.rows])
+            tbl = events(year=year_list, backend="arrow", force=force)
+        sink.write_csv(output, tbl)
 
-    sub.add_parser("list", help="show the seasons that are cached")
-    c = sub.add_parser("cache", help="manage the cache")
-    c.add_argument("action", choices=["path", "verify", "clear"])
-    return p
+    console.print(f"[bold green]✓ Export complete: {output}[/bold green]")
 
 
-def _opts(args: argparse.Namespace) -> Opts:
-    opts: Opts = {}
-    if args.home:
-        opts["home"] = [t for t in args.home.split(",") if t]
-    for key in ("game", "start", "end", "fields", "extended", "jobs"):
-        value = getattr(args, key, None)
-        if value is not None:
-            opts[key] = value
-    return opts
-
-
-def _destination(args: argparse.Namespace, years: list[int]) -> Path | None:
-    """The file to write, or None for stdout. A folder (or a name ending in /) gets a default."""
-    if not args.out:
-        return None
-    out = Path(args.out)
-    if out.is_dir() or args.out.endswith(("/", "\\")):
-        return out / f"{_label(years)}-{args.command}.{_EXT[args.format]}"
-    return out
-
-
-def _run_query(args: argparse.Namespace) -> int:
-    years = parse_years(args.years)
-    spec: Years = years
-    obj = getattr(rs, args.command)(spec, kind=args.kind, cache=args.cache_dir, **_opts(args))
-    dest = _destination(args, years)
-    fmt = args.format
-    if fmt == "sqlite":
-        if dest is None:
-            raise ValueError("--format sqlite needs --out FILE")
-        n = obj.to_sqlite(dest, args.table, if_exists=args.if_exists)
-        print(f"{n} rows -> {dest}")
-        return 0
-    if dest is not None:
-        obj.write(dest, fmt)
-        print(dest)
-        return 0
-    out = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", newline="", write_through=True)
-    try:
-        if args.command == "boxscores":
-            out.write(getattr(obj, fmt)())
-        else:
-            {"csv": obj.to_csv, "jsonl": obj.to_jsonl, "json": obj.to_json}[fmt](out)
-    finally:
-        out.detach()
-    return 0
-
-
-def _silence_stdout() -> None:
-    """Point stdout at /dev/null so Python's exit-time flush does not report the broken pipe again
-    (the recipe from the Python docs for `| head`)."""
-    with contextlib.suppress(OSError, ValueError, AttributeError):  # stdout may not be a real file
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = _parser()
-    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
-    if args.version:
-        print(f"retrosheetpy {__version__}")
-        return 0
-    try:
-        if args.command == "get":
-            for y in parse_years(args.years):
-                s = rs.season(y, kind=args.kind, cache=args.cache_dir, force=args.force)
-                teams = f" ({', '.join(s.teams)})" if s.teams else ""
-                print(f"{s.kind.value} {y}: {len(s.event_files)} event files{teams} -> {s.folder}")
-        elif args.command in TOOLS:
-            return _run_query(args)
-        elif args.command == "fields":
-            for fld in rs.fields(args.table):
-                kind = "x" if fld.extended else "f"
-                print(f"{kind}{fld.number:>3}  {fld.description}")
-        elif args.command == "list":
-            for kind in Kind:
-                for y in rs.cached_seasons(args.cache_dir, kind):
-                    print(y if kind is Kind.REGULAR else f"{kind.value} {y}")
-        elif args.command == "cache":
-            if args.action == "path":
-                print(rs.cache_dir(args.cache_dir))
-            elif args.action == "clear":
-                print(f"removed {rs.clear_cache(args.cache_dir)}")
-            else:
-                problems = rs.verify_cache(args.cache_dir)
-                for line in problems:
-                    print(line, file=sys.stderr)
-                return 1 if problems else 0
-        else:
-            parser.print_usage(sys.stderr)
-            return 2
-    except BrokenPipeError:
-        if argv is None:  # run as a program, not called from Python: stdout is ours to redirect
-            _silence_stdout()
-        return 0  # the reader (e.g. `| head`) closed the pipe; that is not an error
-    except (RetrosheetError, ValueError, OSError, TypeError) as exc:
-        print(f"retrosheetpy: {exc}", file=sys.stderr)
-        return 1
-    return 0
+@main.command()
+@click.option("--clear", is_flag=True, help="Clear local cache")
+def cache(clear: bool) -> None:
+    """Inspect or clear the local download cache."""
+    cm = CacheManager()
+    if clear:
+        cm.clear()
+        console.print("[bold yellow]✓ Cache cleared successfully.[/bold yellow]")
+    else:
+        console.print(f"[bold]Cache Directory:[/bold] {cm.root}")
+        size = sum(f.stat().st_size for f in cm.root.glob("**/*") if f.is_file())
+        console.print(f"[bold]Total Cached Size:[/bold] {size / (1024 * 1024):.2f} MB")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

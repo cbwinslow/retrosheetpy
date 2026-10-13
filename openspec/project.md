@@ -1,29 +1,37 @@
 # retrosheetpy constitution
 
 ## What it is
-Ask for a Retrosheet season, get data tables. retrosheetpy downloads Retrosheet files, caches them,
-runs the Chadwick tools through `chadwickpy`, and writes CSV/JSON/SQLite/pandas ready for a database.
+`retrosheetpy` is an end-to-end, high-performance, and modular Python library and CLI
+for baseball analysts, researchers, professors, and database administrators.
 
-## Boundaries
+It automatically downloads, caches, parses, and ingests all Retrosheet datasets:
+- **Play-by-Play Event Data**: Parsed via `chadwickpy` (events, games, daily player lines, substitutions, comments, box scores).
+- **Historical Game Logs (1871–present)**: 161+ columns of game scores, line scores, attendance, starting pitchers, and umpires.
+- **Rosters & Schedules**: Season rosters (`.ROS`), schedules (`sked`), and alignments.
+- **Biographical & Directory Records**: Player biography (`biofile`/people), ballparks (`parks`), transactions, and ejections.
+
+## Boundaries & Architecture
 ```text
-chadwickpy   = port of the Chadwick C tools. No network.
-retrosheetpy = download + cache + verify + parse via chadwickpy + table shaping (this repo).
-mlb-baseball = PostgreSQL ingestion; uses the original C tools until ADR-299 there is superseded.
+chadwickpy   = pure-Python port of Chadwick C tools (the parser engine). Zero network, zero storage.
+retrosheetpy = downloads Retrosheet files, caches locally, parses via chadwickpy & native parsers,
+               coerces into strongly-typed schemas (Dates, Integers, Booleans, Floats), and emits to
+               DuckDB, Parquet, Arrow, Polars, pandas, and SQL/dlt.
+mlb-baseball = downstream consumer / database deployment using retrosheetpy.
 ```
-Dependency direction: `mlb-baseball` -> `retrosheetpy` -> `chadwickpy`. retrosheetpy never reimplements parsing.
+Dependency direction: `mlb-baseball` -> `retrosheetpy` -> `chadwickpy`. Never the reverse.
 
 ## Invariants
-1. **Safe downloads:** https only, no redirects off https, size and member caps on zips, checksum/verify, atomic cache writes.
-2. **Never a Retrosheet data file in the repo;** tests use fakes and tiny captured fixtures, never the live site.
-3. **Every kind of Retrosheet file is handled or explicitly refused:** regular, postseason, all-star, Negro Leagues, deduced, box-score-only.
-4. **Output is faithful to Chadwick's output;** shaping adds structure, not meaning.
-5. **Failures are clear:** a bad archive, missing season or tool error names what failed and what to do.
-6. **Minimal dependencies** (today `chadwickpy` only; pandas optional).
-7. Credit and data-use notice stay in README/NOTICE.
-
-## Workflow
-OpenSpec: `/opsx:propose` -> `/opsx:apply` -> `/opsx:archive`. ADRs in `docs/DECISIONS.md`. Test first. Conventional Commits; PRs only.
+1. **Strongly-Typed Schemas, Never Raw Text**: Retrosheet text files must be parsed into rich types (e.g. `DATE`, `INTEGER`, `BOOLEAN`, `FLOAT`, `VARCHAR`) across all export formats (DuckDB, Parquet, PyArrow, Polars).
+2. **Decoupled Architecture**: Extract (download/cache), Parse (transform/schema), and Sink (DuckDB/Parquet/Arrow/dlt) are separated by Python Protocols so any component can be swapped without changing client APIs.
+3. **Smart Local Caching**: Never re-download raw files unless explicitly requested or hashes differ. Cache resides in user-configurable directories (`~/.cache/retrosheetpy`).
+4. **Developer-Friendly Namespace**: Expose an intuitive, discoverable Python API (`rs.events()`, `rs.game_logs()`, `rs.rosters()`, `rs.to_duckdb()`) and a companion CLI (`retrosheetpy ingest`, `retrosheetpy export`).
+5. **No C Compiler Required**: Must be installable with standard `pip install retrosheetpy` or `uv add retrosheetpy` on Windows, macOS, and Linux without native build toolchains.
+6. **Multi-Era Robustness**: Handle historical data anomalies, era changes, and format evolutions gracefully with versioned schemas.
 
 ## Phases
-- **Now:** land the stacked PRs (#5, #6, #8) and prove acceptance (`acceptance-and-release`).
-- **Then:** release 1.0 once chadwickpy verification completes.
+- **Phase 1: Project Scaffolding & Specifications**: OpenSpec baseline, specs for Extract, Schema/Parse, and Sink.
+- **Phase 2: Extract & Cache Engine**: Downloaders with HTTP connection pooling, retry logic, unzip handlers, and cache managers.
+- **Phase 3: Schema & Parsing Layer**: Typed PyArrow schemas for Chadwick outputs, game logs, rosters, and biofiles.
+- **Phase 4: Sinks (DuckDB, Parquet, Polars/pandas, dlt)**: Ingestion drivers and export routines.
+- **Phase 5: CLI & Python API**: Unified `retrosheetpy` CLI and top-level namespace.
+- **Phase 6: Verification & Publishing**: Integration test suite run against `cbwsff1`, docs on GitHub Pages, PyPI release.

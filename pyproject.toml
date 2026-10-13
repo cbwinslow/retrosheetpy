@@ -1,21 +1,19 @@
 [project]
 name = "retrosheetpy"
 dynamic = ["version"]
-description = "Download Retrosheet seasons, cache them, and turn them into data tables with the Chadwick tools. Pure Python, no compiler needed."
+description = "Fast, modular, and strongly-typed Retrosheet baseball data downloader, parser, and database ingestor."
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE", "NOTICE", "COPYING-chadwick"]
 requires-python = ">=3.11"
-dependencies = ["chadwickpy>=0.2.0"]
 authors = [{ name = "C. B. Winslow" }]
-keywords = ["baseball", "retrosheet", "chadwick", "play-by-play", "sabermetrics", "data"]
+keywords = ["baseball", "retrosheet", "sabermetrics", "chadwick", "duckdb", "parquet", "play-by-play", "dlt"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -23,8 +21,22 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+dependencies = [
+  "chadwickpy>=0.4.0",
+  "pyarrow>=14.0.0",
+  "duckdb>=1.0.0",
+  "httpx>=0.25.0",
+  "rich>=13.0.0",
+  "click>=8.1.0",
+]
+
 [project.optional-dependencies]
-pandas = ["pandas"]  # for Table.to_pandas()
+polars = ["polars>=1.0.0"]
+pandas = ["pandas>=2.0.0"]
+dlt = ["dlt[duckdb,postgres,snowflake]>=1.0.0"]
+all = [
+  "retrosheetpy[polars,pandas,dlt]",
+]
 
 [project.urls]
 Homepage = "https://github.com/cbwinslow/retrosheetpy"
@@ -32,11 +44,16 @@ Source = "https://github.com/cbwinslow/retrosheetpy"
 Issues = "https://github.com/cbwinslow/retrosheetpy/issues"
 Changelog = "https://github.com/cbwinslow/retrosheetpy/blob/main/CHANGELOG.md"
 
+[dependency-groups]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-mock>=3.12.0",
+  "ruff>=0.4.0",
+  "mypy>=1.10.0",
+]
+
 [project.scripts]
 retrosheetpy = "retrosheetpy.cli:main"
-
-[dependency-groups]
-dev = ["pytest>=8", "ruff", "mypy", "coverage"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -59,11 +76,11 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "S", "SIM", "PTH", "RUF"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]  # plain asserts are how pytest tests check things
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.mypy]
 strict = true
 files = ["src"]
+ignore_missing_imports = true
+disallow_untyped_decorators = false

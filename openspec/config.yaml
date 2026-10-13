@@ -1,45 +1,18 @@
 schema: spec-driven
 
 context: |
-  Read openspec/project.md first (constitution) and AGENTS.md. retrosheetpy
-  downloads Retrosheet files, caches them, runs the Chadwick tools through
-  chadwickpy, and shapes the result into tables ready for a database. It does
-  not reimplement Chadwick (that is chadwickpy). Tests never touch the live
-  Retrosheet site; no Retrosheet data is committed.
+  Read openspec/project.md first (constitution), AGENTS.md, and CLAUDE.md.
+  retrosheetpy is an automated, decoupled Python library and CLI for downloading,
+  caching, parsing, and ingesting Retrosheet baseball data (play-by-play events via
+  chadwickpy, game logs, rosters, ballparks, player bio registry, transactions,
+  and schedules). It produces strongly-typed schemas (PyArrow, DuckDB, Polars,
+  Parquet, CSV, and optional dlt destinations), avoiding generic text dumps.
 
 rules:
   design:
-    - Record hard-to-reverse, surprising decisions as an ADR in docs/DECISIONS.md and cite the number.
+    - Keep Extract, Parse, and Sink stages decoupled via Protocols/interfaces.
+    - Always define explicit data types (integers, dates, booleans, categoricals), never raw untyped strings.
+    - Record architectural decisions in docs/DECISIONS.md.
   tasks:
-    - Write the failing test first, using a fake fetch and tiny captured fixtures.
-
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
-
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
-
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+    - Write unit/contract tests for schemas and loaders before implementation.
+    - Test large-scale season downloads and multi-decade ingestion against cbwsff1 test box.
