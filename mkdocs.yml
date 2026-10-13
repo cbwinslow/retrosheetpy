@@ -90,7 +90,12 @@ nav:
       - Architecture Decisions (ADRs): DECISIONS.md
   - Datasets & Schemas:
       - Play-by-Play Events: datasets/events.md
+      - Postseason & All-Star: datasets/postseason-allstar.md
       - Historical Game Logs: datasets/gamelogs.md
+      - Official Schedules: datasets/schedules.md
+      - Biographical Encyclopedia: datasets/bio.md
+      - Official Ejections Log: datasets/ejections.md
+      - Player Transactions: datasets/transactions.md
       - Team Rosters: datasets/rosters.md
       - Ballpark Directory: datasets/parks.md
   - Storage & Ingestion:

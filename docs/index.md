@@ -101,7 +101,7 @@ flowchart LR
 * **Explicit, Strongly Typed Schemas**: Dates are parsed to `DATE`, counts and scores to `INTEGER`, flags to `BOOLEAN`. No untyped string conversions or silent failures.
 * **Smart Bandwidth Caching**: Downloads once to `~/.cache/retrosheetpy/` with atomic writes, respecting Retrosheet server bandwidth.
 * **Pre-Existing Table Alignment**: When ingesting into existing database tables, columns are automatically mapped by name—only matching columns are inserted.
-* **Complete Retrosheet Catalog**: Events (play-by-play), Game Logs (1871–present), Rosters (`.ROS`), and Ballparks (`parkcode.txt`).
+* **Complete Retrosheet Catalog**: Regular season Events (play-by-play), Postseason, All-Star games, Game Logs (1871–present), Rosters, Ballparks, Schedules, Biographical encyclopedia, Ejections, and Player Transactions.
 
 ---
 
