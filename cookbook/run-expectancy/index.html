@@ -9,18 +9,18 @@
 </span><span id=__span-1-5><a id=__codelineno-1-5 name=__codelineno-1-5 href=#__codelineno-1-5></a><span class=n>query</span> <span class=o>=</span> <span class=s2>"""</span>
 </span><span id=__span-1-6><a id=__codelineno-1-6 name=__codelineno-1-6 href=#__codelineno-1-6></a><span class=s2>WITH half_innings AS (</span>
 </span><span id=__span-1-7><a id=__codelineno-1-7 name=__codelineno-1-7 href=#__codelineno-1-7></a><span class=s2>    -- Total runs scored in each half-inning</span>
-</span><span id=__span-1-8><a id=__codelineno-1-8 name=__codelineno-1-8 href=#__codelineno-1-8></a><span class=s2>    SELECT </span>
+</span><span id=__span-1-8><a id=__codelineno-1-8 name=__codelineno-1-8 href=#__codelineno-1-8></a><span class=s2>    SELECT</span>
 </span><span id=__span-1-9><a id=__codelineno-1-9 name=__codelineno-1-9 href=#__codelineno-1-9></a><span class=s2>        GAME_ID,</span>
 </span><span id=__span-1-10><a id=__codelineno-1-10 name=__codelineno-1-10 href=#__codelineno-1-10></a><span class=s2>        INN_CT,</span>
 </span><span id=__span-1-11><a id=__codelineno-1-11 name=__codelineno-1-11 href=#__codelineno-1-11></a><span class=s2>        BAT_HOME_ID,</span>
-</span><span id=__span-1-12><a id=__codelineno-1-12 name=__codelineno-1-12 href=#__codelineno-1-12></a><span class=s2>        MAX(CASE WHEN BAT_HOME_ID = 0 THEN AWAY_SCORE_CT ELSE HOME_SCORE_CT END) - </span>
+</span><span id=__span-1-12><a id=__codelineno-1-12 name=__codelineno-1-12 href=#__codelineno-1-12></a><span class=s2>        MAX(CASE WHEN BAT_HOME_ID = 0 THEN AWAY_SCORE_CT ELSE HOME_SCORE_CT END) -</span>
 </span><span id=__span-1-13><a id=__codelineno-1-13 name=__codelineno-1-13 href=#__codelineno-1-13></a><span class=s2>        MIN(CASE WHEN BAT_HOME_ID = 0 THEN AWAY_SCORE_CT ELSE HOME_SCORE_CT END) AS runs_in_half_inning</span>
 </span><span id=__span-1-14><a id=__codelineno-1-14 name=__codelineno-1-14 href=#__codelineno-1-14></a><span class=s2>    FROM events</span>
 </span><span id=__span-1-15><a id=__codelineno-1-15 name=__codelineno-1-15 href=#__codelineno-1-15></a><span class=s2>    GROUP BY GAME_ID, INN_CT, BAT_HOME_ID</span>
 </span><span id=__span-1-16><a id=__codelineno-1-16 name=__codelineno-1-16 href=#__codelineno-1-16></a><span class=s2>),</span>
 </span><span id=__span-1-17><a id=__codelineno-1-17 name=__codelineno-1-17 href=#__codelineno-1-17></a><span class=s2>play_states AS (</span>
 </span><span id=__span-1-18><a id=__codelineno-1-18 name=__codelineno-1-18 href=#__codelineno-1-18></a><span class=s2>    -- Base runners state encoded as string: '---', '1--', '-2-', '12-', '123', etc.</span>
-</span><span id=__span-1-19><a id=__codelineno-1-19 name=__codelineno-1-19 href=#__codelineno-1-19></a><span class=s2>    SELECT </span>
+</span><span id=__span-1-19><a id=__codelineno-1-19 name=__codelineno-1-19 href=#__codelineno-1-19></a><span class=s2>    SELECT</span>
 </span><span id=__span-1-20><a id=__codelineno-1-20 name=__codelineno-1-20 href=#__codelineno-1-20></a><span class=s2>        e.GAME_ID,</span>
 </span><span id=__span-1-21><a id=__codelineno-1-21 name=__codelineno-1-21 href=#__codelineno-1-21></a><span class=s2>        e.INN_CT,</span>
 </span><span id=__span-1-22><a id=__codelineno-1-22 name=__codelineno-1-22 href=#__codelineno-1-22></a><span class=s2>        e.BAT_HOME_ID,</span>
@@ -33,12 +33,12 @@
 </span><span id=__span-1-29><a id=__codelineno-1-29 name=__codelineno-1-29 href=#__codelineno-1-29></a><span class=s2>        -- Runs scored from this point forward until 3 outs</span>
 </span><span id=__span-1-30><a id=__codelineno-1-30 name=__codelineno-1-30 href=#__codelineno-1-30></a><span class=s2>        h.runs_in_half_inning - (CASE WHEN e.BAT_HOME_ID = 0 THEN e.AWAY_SCORE_CT ELSE e.HOME_SCORE_CT END) AS future_runs</span>
 </span><span id=__span-1-31><a id=__codelineno-1-31 name=__codelineno-1-31 href=#__codelineno-1-31></a><span class=s2>    FROM events e</span>
-</span><span id=__span-1-32><a id=__codelineno-1-32 name=__codelineno-1-32 href=#__codelineno-1-32></a><span class=s2>    JOIN half_innings h </span>
-</span><span id=__span-1-33><a id=__codelineno-1-33 name=__codelineno-1-33 href=#__codelineno-1-33></a><span class=s2>      ON e.GAME_ID = h.GAME_ID </span>
-</span><span id=__span-1-34><a id=__codelineno-1-34 name=__codelineno-1-34 href=#__codelineno-1-34></a><span class=s2>     AND e.INN_CT = h.INN_CT </span>
+</span><span id=__span-1-32><a id=__codelineno-1-32 name=__codelineno-1-32 href=#__codelineno-1-32></a><span class=s2>    JOIN half_innings h</span>
+</span><span id=__span-1-33><a id=__codelineno-1-33 name=__codelineno-1-33 href=#__codelineno-1-33></a><span class=s2>      ON e.GAME_ID = h.GAME_ID</span>
+</span><span id=__span-1-34><a id=__codelineno-1-34 name=__codelineno-1-34 href=#__codelineno-1-34></a><span class=s2>     AND e.INN_CT = h.INN_CT</span>
 </span><span id=__span-1-35><a id=__codelineno-1-35 name=__codelineno-1-35 href=#__codelineno-1-35></a><span class=s2>     AND e.BAT_HOME_ID = h.BAT_HOME_ID</span>
 </span><span id=__span-1-36><a id=__codelineno-1-36 name=__codelineno-1-36 href=#__codelineno-1-36></a><span class=s2>)</span>
-</span><span id=__span-1-37><a id=__codelineno-1-37 name=__codelineno-1-37 href=#__codelineno-1-37></a><span class=s2>SELECT </span>
+</span><span id=__span-1-37><a id=__codelineno-1-37 name=__codelineno-1-37 href=#__codelineno-1-37></a><span class=s2>SELECT</span>
 </span><span id=__span-1-38><a id=__codelineno-1-38 name=__codelineno-1-38 href=#__codelineno-1-38></a><span class=s2>    base_state,</span>
 </span><span id=__span-1-39><a id=__codelineno-1-39 name=__codelineno-1-39 href=#__codelineno-1-39></a><span class=s2>    ROUND(AVG(CASE WHEN OUTS_CT = 0 THEN future_runs END), 3) AS "0 Outs",</span>
 </span><span id=__span-1-40><a id=__codelineno-1-40 name=__codelineno-1-40 href=#__codelineno-1-40></a><span class=s2>    ROUND(AVG(CASE WHEN OUTS_CT = 1 THEN future_runs END), 3) AS "1 Out",</span>
