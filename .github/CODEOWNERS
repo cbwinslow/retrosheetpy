@@ -1,1 +1,3 @@
-* @cbwinslow @kilocode-bot
+# Every path needs approval from the maintainer. Review bots (CodeRabbit, Kilo)
+# are GitHub Apps: they comment on PRs but cannot be code owners.
+* @cbwinslow

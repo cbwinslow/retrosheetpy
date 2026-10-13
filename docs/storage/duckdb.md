@@ -41,9 +41,9 @@ con = duckdb.connect("baseball.duckdb")
 
 # Top 5 most frequent matchups
 matchups = con.execute("""
-    SELECT 
-        visiting_team, 
-        home_team, 
+    SELECT
+        visiting_team,
+        home_team,
         COUNT(*) AS games_played,
         ROUND(AVG(visiting_score + home_score), 2) AS avg_runs
     FROM game_logs

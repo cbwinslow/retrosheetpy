@@ -29,6 +29,18 @@ jobs:
       - run: uvx ruff format --check .
       - run: uv run mypy src
 
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uvx pre-commit run gitleaks --all-files
+      - run: uvx pre-commit run detect-private-key --all-files
+
   tests:
     name: test (py${{ matrix.python }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -47,7 +59,7 @@ jobs:
           python-version: ${{ matrix.python }}
           enable-cache: true
       - name: Run pytest
-        run: uv run --all-extras pytest -v -rs -p no:cacheprovider
+        run: uv run --all-extras pytest -v -rs -p no:cacheprovider --cov --cov-fail-under=60
 
   package:
     name: build and clean-install check
@@ -77,11 +89,11 @@ jobs:
   # Branch protection requires this check name to succeed.
   test:
     name: test
-    needs: [lint, tests, package]
+    needs: [lint, secrets, tests, package]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Require all gate jobs to succeed
         run: |
-          [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.tests.result }}" = success ] \
+          [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.secrets.result }}" = success ] && [ "${{ needs.tests.result }}" = success ] \
             && [ "${{ needs.package.result }}" = success ] || { echo "One or more CI jobs failed"; exit 1; }
