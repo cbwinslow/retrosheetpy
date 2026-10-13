@@ -1,0 +1,194 @@
+# retrosheetpy: Complete LLM Reference & Developer Guide
+
+> Fast, modular, and strongly-typed Retrosheet baseball data downloader, parser, and database ingestor for Python (3.11+).
+
+---
+
+## 1. Overview & Architecture
+
+`retrosheetpy` is designed for sabermetricians, researchers, database administrators, and data engineers. It replaces legacy ad-hoc shell scripts and brittle scraping pipelines with a decoupled, high-performance architecture:
+
+```
+[ retrosheet.org ]
+        │  (HTTP / ZIP / TXT / CSV)
+        ▼
+[ extract/ (Downloader & CacheManager) ]  <──>  ~/.cache/retrosheetpy/
+        │  (Raw .EVA, .EVN, .ROS, gl*.txt, parkcode.txt, biofile0.csv, tran.txt)
+        ▼
+[ parse/ (EventParser, GameLogParser, ScheduleParser, BioParser, etc.) ]
+        │  (Zero-copy Type Casting against schemas/)
+        ▼
+[ schemas/ (PyArrow Schemas: Events, Game Logs, Rosters, Parks, Schedules, Bio) ]
+        │  (PyArrow Tables & RecordBatches)
+        ▼
+[ sink/ ]
+   ├── dataframe.py  ──> PyArrow Table, Polars DataFrame, pandas DataFrame
+   ├── duckdb_sink.py──> Embedded DuckDB tables (.duckdb)
+   ├── file_sink.py  ──> Parquet, CSV
+   └── dlt_sink.py   ──> dlt pipelines (Postgres, Snowflake, BigQuery)
+```
+
+### Key Design Principles:
+1. **Decoupled:** Download, parsing, schema definitions, and database sinking operate independently.
+2. **Strict Physical Types:** Every field is cast into strongly-typed Apache Arrow types (`date32`, `int8`, `int16`, `int32`, `bool_`, `string`). No loose text columns.
+3. **Pre-Existing Table Alignment:** When ingesting into DuckDB or remote SQL warehouses, existing tables are respected. Matching columns are appended; missing columns with database defaults are left untouched.
+4. **Lightweight Core:** Core installation has zero heavy cloud dependencies. Warehouse ingestion is available via the optional extra: `pip install "retrosheetpy[dlt]"`.
+
+---
+
+## 2. Installation
+
+```bash
+# Core library (DuckDB, PyArrow, Polars, pandas, Parquet)
+pip install retrosheetpy
+
+# With cloud warehouse connectors (PostgreSQL, Snowflake, BigQuery, Databricks)
+pip install "retrosheetpy[dlt]"
+```
+
+---
+
+## 3. Command-Line Interface (CLI)
+
+The CLI uses concise, standard options:
+- `-s, --dataset`: Dataset name or comma-separated list
+- `-y, --years`: Year or range of years (e.g. `2024` or `2020-2024`)
+- `-d, --dest`: Destination database (`duckdb`, `postgres`, `snowflake`, `bigquery`, `sqlite`)
+- `-c, -f, --conn`: Connection string or output file path
+- `-fmt, -f, --format`: Output file format (`parquet`, `csv`)
+- `-o, --output`: Output file path
+- `--force`: Force re-download even if already cached
+
+### CLI Commands:
+```bash
+# 1. Download & cache archives locally without parsing
+retrosheetpy download -s all -y 2024
+retrosheetpy download -s schedules,bio,ejections,transactions
+
+# 2. Ingest into DuckDB (embedded)
+retrosheetpy ingest -d duckdb -c retrosheet.duckdb -s events,gamelogs -y 2020-2024
+
+# 3. Ingest into Cloud Warehouses via dlt
+retrosheetpy ingest -d postgres -c "postgresql://user:pass@localhost:5432/retrosheet" -s all -y 2024
+
+# 4. Export to Parquet or CSV
+retrosheetpy export -s gamelogs -y 2024 -f parquet -o gl2024.parquet
+retrosheetpy export -s bio -f csv -o biofile.csv
+
+# 5. Generate production SQL DDL (CREATE TABLE)
+retrosheetpy ddl -s events --dialect postgres
+retrosheetpy ddl -s schedules --dialect bigquery
+retrosheetpy ddl -s bio --dialect snowflake
+
+# 6. Cache inspection & cleanup
+retrosheetpy cache
+retrosheetpy cache --clear
+```
+
+---
+
+## 4. Python API Reference
+
+### Top-Level Functions (`import retrosheetpy as rs`)
+
+#### `rs.events(year, backend="arrow", force=False)`
+Parses regular season play-by-play events (164 columns) for specified year(s). Backends: `"arrow"`, `"polars"`, `"pandas"`.
+
+#### `rs.postseason(year, backend="arrow", force=False)`
+Parses Postseason play-by-play events (World Series, LCS, LDS, Wild Card) using the same 164-column schema.
+
+#### `rs.allstar(year, backend="arrow", force=False)`
+Parses All-Star Game play-by-play events using the 164-column schema.
+
+#### `rs.game_logs(year, backend="arrow", force=False)`
+Parses official game logs (161 columns) for specified year(s).
+
+#### `rs.schedules(year, backend="arrow", force=False)`
+Parses regular season game schedules (13 columns: date, game number, teams, leagues, day/night, postponement, makeup date).
+
+#### `rs.rosters(year, backend="arrow", force=False)`
+Parses team roster files (8 columns: player ID, name, bats, throws, team, position, year).
+
+#### `rs.parks(backend="arrow", force=False)`
+Parses the ballpark encyclopedia (`parkcode.txt`).
+
+#### `rs.bio(backend="arrow", force=False)`
+Parses master biographical database (32 columns: birth/death dates, locations, debut and last game dates, height, weight, HOF).
+
+#### `rs.ejections(backend="arrow", force=False)`
+Parses official ejections log (11 columns: game ID, date, ejectee, team, job, umpire, inning, reason).
+
+#### `rs.transactions(backend="arrow", force=False)`
+Parses player transactions database (16 columns: dates, transaction ID, player ID, type, trading teams, draft round, pick).
+
+#### `rs.to_duckdb(path, years=2024, datasets=(...), force=False)`
+Directly ingests selected datasets into a DuckDB file.
+
+#### `rs.to_parquet(path, dataset, years=2024, force=False)`
+Exports a dataset into a snappy-compressed Parquet file.
+
+#### `rs.to_dlt(destination, years=2024, datasets=(...), credentials=None)`
+Runs a dlt pipeline to ingest datasets into PostgreSQL, Snowflake, BigQuery, etc.
+
+#### `rs.get_ddl(dataset, dialect="postgres")`
+Returns SQL DDL statement for target dialect (`postgres`, `duckdb`, `sqlite`, `snowflake`, `bigquery`).
+
+#### `rs.download(years=None, datasets="all", force=False)`
+Downloads raw zip/text files into local cache without reading them into memory.
+
+---
+
+## 5. Dataset Schema Summary
+
+1. **`events` / `postseason` / `allstar` (`EVENT_SCHEMA` - 164 cols):**
+   - Game & State: `GAME_ID` (string), `AWAY_TEAM_ID` (string), `INN_CT` (int16), `BAT_HOME_ID` (int8), `OUTS_CT` (int8), `BALLS_CT` (int8), `STRIKES_CT` (int8), `PITCH_SEQ_TX` (string).
+   - Participants: `AWAY_SCORE_CT` (int16), `HOME_SCORE_CT` (int16), `BAT_ID` (string), `BAT_HAND_CD` (string), `RESP_BAT_ID` (string), `PIT_ID` (string), `PIT_HAND_CD` (string).
+   - Event Details: `EVENT_TX` (string), `LEADOFF_FL` (bool), `PH_FL` (bool), `BAT_FLD_CD` (int8), `BAT_LINEUP_ID` (int8), `EVENT_CD` (int16), `BAT_DEST_ID` (int8), `RUN1_DEST_ID` (int8), `RUN2_DEST_ID` (int8), `RUN3_DEST_ID` (int8).
+
+2. **`gamelogs` (`GAMELOG_SCHEMA` - 161 cols):**
+   - Core: `date` (date32), `game_number` (int8), `day_of_week` (string), `visiting_team` (string), `visiting_score` (int16), `home_team` (string), `home_score` (int16), `outs_total` (int16), `day_night` (string), `park_id` (string), `attendance` (int32).
+   - Line Scores & Stats: Team batting/pitching aggregates, umpires, managers, winning/losing/saving pitchers, starting lineups (positions 1-9 for both home and away).
+
+3. **`schedules` (`SCHEDULE_SCHEMA` - 13 cols):**
+   - `date` (date32), `game_num` (int8), `day_of_week` (string), `vis_team` (string), `vis_league` (string), `vis_game_num` (int16), `home_team` (string), `home_league` (string), `home_game_num` (int16), `day_night` (string), `park_id` (string), `postponed` (string), `makeup_date` (date32).
+
+4. **`bio` (`BIO_SCHEMA` - 32 cols):**
+   - `player_id` (string), `last_name` (string), `use_name` (string), `full_name` (string), `birth_date` (date32), `birth_city` (string), `birth_state` (string), `birth_country` (string), `death_date` (date32), `death_city` (string), `death_state` (string), `death_country` (string), `cemetery` (string), `debut_player` (date32), `last_player` (date32), `debut_coach` (date32), `last_coach` (date32), `debut_manager` (date32), `last_manager` (date32), `debut_umpire` (date32), `last_umpire` (date32), `bats` (string), `throws` (string), `height_inches` (int16), `weight_lbs` (int16), `hof` (string).
+
+5. **`ejections` (`EJECTION_SCHEMA` - 11 cols):**
+   - `game_id` (string), `date` (date32), `dh` (string), `ejectee_id` (string), `ejectee_name` (string), `team_id` (string), `job` (string), `umpire_id` (string), `umpire_name` (string), `inning` (int8), `reason` (string).
+
+6. **`transactions` (`TRANSACTION_SCHEMA` - 16 cols):**
+   - `primary_date` (date32), `time` (string), `approx_indicator` (string), `secondary_date` (date32), `approx_indicator_sec` (string), `transaction_id` (string), `player_id` (string), `type` (string), `from_team` (string), `from_league` (string), `to_team` (string), `to_league` (string), `draft_type` (string), `draft_round` (int16), `pick_number` (int16), `info` (string).
+
+---
+
+## 6. Sabermetric Code Snippet (RE24 in Polars)
+
+```python
+import polars as pl
+import retrosheetpy as rs
+
+# Load 2024 events into Polars
+df = rs.events(2024, backend="polars")
+
+# Define base state (0: empty, 1: occupied)
+df = df.with_columns(
+    (
+        pl.when(pl.col("BASE1_RUN_ID").is_not_null()).then(1).otherwise(0)
+        + pl.when(pl.col("BASE2_RUN_ID").is_not_null()).then(2).otherwise(0)
+        + pl.when(pl.col("BASE3_RUN_ID").is_not_null()).then(4).otherwise(0)
+    ).alias("base_state")
+)
+
+# 24-State Base/Out Matrix
+re24 = (
+    df.group_by(["OUTS_CT", "base_state"])
+    .agg([
+        pl.len().alias("occurrences"),
+        pl.col("EVENT_RUNS_CT").mean().alias("run_expectancy"),
+    ])
+    .sort(["OUTS_CT", "base_state"])
+)
+print(re24)
+```
