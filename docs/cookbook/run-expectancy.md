@@ -35,18 +35,18 @@ con = duckdb.connect("retro.duckdb")
 query = """
 WITH half_innings AS (
     -- Total runs scored in each half-inning
-    SELECT 
+    SELECT
         GAME_ID,
         INN_CT,
         BAT_HOME_ID,
-        MAX(CASE WHEN BAT_HOME_ID = 0 THEN AWAY_SCORE_CT ELSE HOME_SCORE_CT END) - 
+        MAX(CASE WHEN BAT_HOME_ID = 0 THEN AWAY_SCORE_CT ELSE HOME_SCORE_CT END) -
         MIN(CASE WHEN BAT_HOME_ID = 0 THEN AWAY_SCORE_CT ELSE HOME_SCORE_CT END) AS runs_in_half_inning
     FROM events
     GROUP BY GAME_ID, INN_CT, BAT_HOME_ID
 ),
 play_states AS (
     -- Base runners state encoded as string: '---', '1--', '-2-', '12-', '123', etc.
-    SELECT 
+    SELECT
         e.GAME_ID,
         e.INN_CT,
         e.BAT_HOME_ID,
@@ -59,12 +59,12 @@ play_states AS (
         -- Runs scored from this point forward until 3 outs
         h.runs_in_half_inning - (CASE WHEN e.BAT_HOME_ID = 0 THEN e.AWAY_SCORE_CT ELSE e.HOME_SCORE_CT END) AS future_runs
     FROM events e
-    JOIN half_innings h 
-      ON e.GAME_ID = h.GAME_ID 
-     AND e.INN_CT = h.INN_CT 
+    JOIN half_innings h
+      ON e.GAME_ID = h.GAME_ID
+     AND e.INN_CT = h.INN_CT
      AND e.BAT_HOME_ID = h.BAT_HOME_ID
 )
-SELECT 
+SELECT
     base_state,
     ROUND(AVG(CASE WHEN OUTS_CT = 0 THEN future_runs END), 3) AS "0 Outs",
     ROUND(AVG(CASE WHEN OUTS_CT = 1 THEN future_runs END), 3) AS "1 Out",

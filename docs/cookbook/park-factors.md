@@ -27,7 +27,7 @@ con = duckdb.connect("retro.duckdb")
 
 query = """
 WITH home_runs_scored AS (
-    SELECT 
+    SELECT
         home_team AS team,
         park_id,
         COUNT(*) AS home_games,
@@ -36,14 +36,14 @@ WITH home_runs_scored AS (
     GROUP BY home_team, park_id
 ),
 road_runs_scored AS (
-    SELECT 
+    SELECT
         visiting_team AS team,
         COUNT(*) AS road_games,
         SUM(home_score + visiting_score) AS road_runs
     FROM game_logs
     GROUP BY visiting_team
 )
-SELECT 
+SELECT
     p.name AS ballpark,
     h.team,
     h.home_games,

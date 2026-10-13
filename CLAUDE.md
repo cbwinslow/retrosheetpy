@@ -6,7 +6,7 @@
   - Run all tests: `uv run pytest`
   - Run specific test: `uv run pytest tests/test_extract.py -k "test_download"`
   - Formatting & Linting: `uvx ruff check .` and `uvx ruff format .`
-  - Type checking: `uvx mypy --strict src`
+  - Type checking: `uv run mypy src`
 - **CLI Usage:**
   - `uv run retrosheetpy --help`
   - `uv run retrosheetpy download --years 2024 --dataset events`
