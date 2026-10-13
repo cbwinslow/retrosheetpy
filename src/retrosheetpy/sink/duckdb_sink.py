@@ -7,6 +7,20 @@ from pathlib import Path
 import duckdb
 import pyarrow as pa
 
+TABLE_PRIMARY_KEYS: dict[str, list[str]] = {
+    "game_logs": ["date", "home_team", "game_number"],
+    "gamelogs": ["date", "home_team", "game_number"],
+    "events": ["game_id", "event_id"],
+    "postseason_events": ["game_id", "event_id"],
+    "allstar_events": ["game_id", "event_id"],
+    "rosters": ["year", "team_id", "player_id"],
+    "schedules": ["date", "home_team", "game_num"],
+    "parks": ["park_id"],
+    "biographical": ["player_id"],
+    "bio": ["player_id"],
+    "transactions": ["transaction_id"],
+}
+
 
 class DuckDBSink:
     """Manages writing strongly-typed PyArrow Tables into an embedded DuckDB database."""
@@ -52,9 +66,18 @@ class DuckDBSink:
                 )
 
             cols_sql = ", ".join(f'"{c}"' for c in matching_cols)
-            self.con.execute(
-                f"INSERT INTO {table_name} ({cols_sql}) SELECT {cols_sql} FROM _incoming_arrow"
-            )
+            pks = TABLE_PRIMARY_KEYS.get(table_name)
+            if pks and all(k in matching_cols for k in pks):
+                join_cond = " AND ".join(f'target."{k}" = source."{k}"' for k in pks)
+                self.con.execute(
+                    f"INSERT INTO {table_name} ({cols_sql}) "
+                    f"SELECT {cols_sql} FROM _incoming_arrow source "
+                    f"WHERE NOT EXISTS (SELECT 1 FROM {table_name} target WHERE {join_cond})"
+                )
+            else:
+                self.con.execute(
+                    f"INSERT INTO {table_name} ({cols_sql}) SELECT {cols_sql} FROM _incoming_arrow"
+                )
 
         self.con.unregister("_incoming_arrow")
 

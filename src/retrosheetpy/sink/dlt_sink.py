@@ -49,11 +49,7 @@ def retrosheet_source(
 
         if "bio" in selected_datasets:
 
-            @dlt.resource(
-                name="biographical",
-                write_disposition="merge",
-                primary_key="player_id",
-            )
+            @dlt.resource(name="biographical", write_disposition="replace")
             def _bio_resource() -> Iterator[dict[str, Any]]:
                 parser = BioParser()
                 path = dl.get_bio()
@@ -77,11 +73,7 @@ def retrosheet_source(
 
         if "transactions" in selected_datasets:
 
-            @dlt.resource(
-                name="transactions",
-                write_disposition="merge",
-                primary_key="transaction_id",
-            )
+            @dlt.resource(name="transactions", write_disposition="replace")
             def _transactions_resource() -> Iterator[dict[str, Any]]:
                 parser = TransactionParser()
                 path = dl.get_transactions()
@@ -96,7 +88,7 @@ def retrosheet_source(
             @dlt.resource(
                 name="schedules",
                 write_disposition="merge",
-                primary_key="game_id",
+                primary_key=["date", "home_team", "game_num"],
             )
             def _schedules_resource() -> Iterator[dict[str, Any]]:
                 parser = ScheduleParser()
@@ -119,7 +111,7 @@ def retrosheet_source(
             @dlt.resource(
                 name="game_logs",
                 write_disposition="merge",
-                primary_key="game_id",
+                primary_key=["date", "home_team", "game_number"],
             )
             def _gamelogs_resource() -> Iterator[dict[str, Any]]:
                 parser = GameLogParser()
@@ -137,7 +129,7 @@ def retrosheet_source(
             @dlt.resource(
                 name="rosters",
                 write_disposition="merge",
-                primary_key=["year", "team", "player_id"],
+                primary_key=["year", "team_id", "player_id"],
             )
             def _rosters_resource() -> Iterator[dict[str, Any]]:
                 parser = RosterParser()

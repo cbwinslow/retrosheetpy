@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 import httpx
@@ -126,9 +127,16 @@ class Downloader:
 
         url = self.manifest.ejections_url()
         content = self._fetch_bytes(url)
-        tmp_target = target.with_suffix(".csv.tmp")
-        tmp_target.write_bytes(content)
-        tmp_target.replace(target)
+        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False, suffix=".csv.tmp") as tmp:
+            tmp_path = Path(tmp.name)
+            tmp.write(content)
+
+        try:
+            tmp_path.replace(target)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
         return target
 
     def get_transactions(self, force: bool = False) -> Path:
