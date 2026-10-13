@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/cbwinslow/retrosheetpy/compare/v1.1.0...v2.0.0) (2026-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* Complete architectural overhaul with decoupled extract/parse/schemas/sink modules, PyArrow strongly-typed schemas (164-col events, 161-col gamelogs, rosters, parks), DuckDB/Parquet/dlt/SQL sinks, and new CLI.
+
+### Features
+
+* overhaul architecture with strongly-typed multi-dataset pipeline (DuckDB, Parquet, dlt, SQL DDL) ([#19](https://github.com/cbwinslow/retrosheetpy/issues/19)) ([5f28b91](https://github.com/cbwinslow/retrosheetpy/commit/5f28b9178d9b7c4549805d4c1bc97a50557a471b))
+
 ## [1.1.0](https://github.com/cbwinslow/retrosheetpy/compare/v1.0.1...v1.1.0) (2026-10-09)
 
 
