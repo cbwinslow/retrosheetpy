@@ -26,18 +26,19 @@ retrosheetpy download [OPTIONS]
 ### Options
 * `-s, --dataset [events|postseason|allstar|gamelogs|rosters|parks|schedules|bio|ejections|transactions|all]` *(Default: `all`)*: Dataset to download.
 * `-y, --years TEXT` *(Optional)*: Year or range of years (e.g. `2024` or `2020-2024`).
+* `-S, --source [github|retrosheet|auto]` *(Default: `github`)*: Authoritative download source. Defaults to Fastly-backed GitHub raw mirror (`chadwickbureau/retrosheet`).
 * `--force`: Force re-download even if already cached.
 
 ### Examples
 ```bash
-# Download and extract 2024 event files
-retrosheetpy download -s events -y 2024
+# Download and extract 2024 event files from GitHub mirror
+retrosheetpy download -s events -y 2024 --source github
 
-# Download all 2020-2024 archives into cache
-retrosheetpy download -s all -y 2020-2024
+# Download all 2020-2024 archives into cache with automatic fallback
+retrosheetpy download -s all -y 2020-2024 --source auto
 
-# Download reference files (parks, biofile, ejections, transactions)
-retrosheetpy download -s bio,parks,ejections,transactions
+# Download reference files (parks, biofile, ejections)
+retrosheetpy download -s bio,parks,ejections
 ```
 
 ---
@@ -55,6 +56,7 @@ retrosheetpy ingest [OPTIONS]
 * `-c, -f, --conn PATH/URI` *(Required)*: Output file path (for DuckDB/SQLite) or warehouse connection URI (for Postgres, Snowflake, BigQuery).
 * `-s, --dataset TEXT` *(Default: `events,gamelogs,rosters,parks`)*: Comma-separated list of datasets to ingest, or `all`.
 * `-y, --years TEXT` *(Default: `2024`)*: Year or range of years (e.g. `2024` or `2010-2024`).
+* `-S, --source [github|retrosheet|auto]` *(Default: `github`)*: Download source mirror.
 * `--force`: Force re-download even if already present in local cache.
 
 ### Examples
@@ -62,7 +64,7 @@ retrosheetpy ingest [OPTIONS]
 # Ingest 2020 through 2024 into local DuckDB
 retrosheetpy ingest -d duckdb -c retro.duckdb -s events,gamelogs -y 2020-2024
 
-# Ingest all 2024 data into PostgreSQL warehouse (requires pip install "retrosheetpy[dlt]")
+# Ingest all 2024 data into PostgreSQL warehouse via dlt
 retrosheetpy ingest -d postgres -c "postgresql://user:pass@localhost:5432/retrosheet" -s all -y 2024
 
 # Ingest into Snowflake
@@ -84,6 +86,7 @@ retrosheetpy export [OPTIONS]
 * `-y, --years TEXT` *(Default: `2024`)*: Year or range of years (e.g. `2024` or `2000-2024`).
 * `-o, --output PATH` *(Required)*: Output file path (e.g. `gamelogs_2024.parquet`).
 * `-f, -fmt, --format [parquet|csv]` *(Default: `parquet`)*: Output file format.
+* `-S, --source [github|retrosheet|auto]` *(Default: `github`)*: Download source mirror.
 * `--force`: Force re-download even if already present in local cache.
 
 ### Examples

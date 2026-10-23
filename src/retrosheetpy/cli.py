@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import click
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -39,6 +41,8 @@ DATASET_CHOICES = [
     "all",
 ]
 
+SOURCE_CHOICES = ["github", "retrosheet", "auto"]
+
 
 def _parse_years_arg(years_str: str) -> list[int]:
     """Parses year strings like '2020-2024' or '2021,2022,2023' into a list of integers."""
@@ -74,18 +78,27 @@ def main() -> None:
     default=None,
     help="Year or range of years (e.g. '2024' or '2020-2024')",
 )
+@click.option(
+    "--source",
+    "-S",
+    type=click.Choice(SOURCE_CHOICES),
+    default="github",
+    help="Download source mirror (default: github)",
+)
 @click.option("--force", is_flag=True, help="Force re-download even if already cached")
-def download(dataset: str, years: str | None, force: bool) -> None:
+def download(
+    dataset: str, years: str | None, source: Literal["github", "retrosheet", "auto"], force: bool
+) -> None:
     """Download and cache Retrosheet archives locally."""
     year_list = _parse_years_arg(years) if years else None
     display_years = f" ({years})" if years else ""
-    console.print(f"[bold blue]Downloading {dataset}{display_years}...[/bold blue]")
+    console.print(f"[bold blue]Downloading {dataset}{display_years} via {source}...[/bold blue]")
 
     with Progress(
         SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True
     ) as progress:
         task = progress.add_task("Downloading...", total=None)
-        results = api_download(years=year_list, datasets=dataset, force=force)
+        results = api_download(years=year_list, datasets=dataset, source=source, force=force)
         progress.update(task, completed=True)
 
     for ds, paths in results.items():
@@ -120,8 +133,22 @@ def download(dataset: str, years: str | None, force: bool) -> None:
     default="2024",
     help="Year or range of years (e.g. '2024' or '2020-2024')",
 )
+@click.option(
+    "--source",
+    "-S",
+    type=click.Choice(SOURCE_CHOICES),
+    default="github",
+    help="Download source mirror (default: github)",
+)
 @click.option("--force", is_flag=True, help="Force re-download even if cached")
-def ingest(dest: str, conn: str, dataset: str, years: str, force: bool) -> None:
+def ingest(
+    dest: str,
+    conn: str,
+    dataset: str,
+    years: str,
+    source: Literal["github", "retrosheet", "auto"],
+    force: bool,
+) -> None:
     """Ingest Retrosheet data into DuckDB or remote SQL warehouses (Postgres, Snowflake, etc.)."""
     year_list = _parse_years_arg(years)
     if dataset.lower() == "all":
@@ -138,7 +165,9 @@ def ingest(dest: str, conn: str, dataset: str, years: str, force: bool) -> None:
     else:
         dataset_list = [d.strip() for d in dataset.split(",")]
 
-    console.print(f"[bold green]Starting ingestion into {dest}:[/bold green] {conn}")
+    console.print(
+        f"[bold green]Starting ingestion into {dest}:[/bold green] {conn} (source: {source})"
+    )
     console.print(
         f"Years: {year_list[0]}–{year_list[-1]} ({len(year_list)} seasons), Datasets: {dataset_list}"
     )
@@ -152,6 +181,7 @@ def ingest(dest: str, conn: str, dataset: str, years: str, force: bool) -> None:
                 path=conn,
                 years=year_list,
                 datasets=dataset_list,
+                source=source,
                 force=force,
             )
         else:
@@ -160,6 +190,7 @@ def ingest(dest: str, conn: str, dataset: str, years: str, force: bool) -> None:
                     destination=dest,
                     years=year_list,
                     datasets=dataset_list,
+                    source=source,
                     credentials=conn,
                 )
             except ImportError:
@@ -187,41 +218,57 @@ def ingest(dest: str, conn: str, dataset: str, years: str, force: bool) -> None:
 )
 @click.option("--format", "-f", "-fmt", type=click.Choice(["parquet", "csv"]), default="parquet")
 @click.option("--output", "-o", required=True, help="Output file path (e.g. gamelogs_2024.parquet)")
+@click.option(
+    "--source",
+    "-S",
+    type=click.Choice(SOURCE_CHOICES),
+    default="github",
+    help="Download source mirror (default: github)",
+)
 @click.option("--force", is_flag=True, help="Force re-download even if cached")
-def export(dataset: str, years: str, format: str, output: str, force: bool) -> None:
+def export(
+    dataset: str,
+    years: str,
+    format: str,
+    output: str,
+    source: Literal["github", "retrosheet", "auto"],
+    force: bool,
+) -> None:
     """Export Retrosheet data to Parquet or CSV format."""
     year_list = _parse_years_arg(years)
-    console.print(f"[bold blue]Exporting {dataset} ({years}) to {output} ({format})...[/bold blue]")
+    console.print(
+        f"[bold blue]Exporting {dataset} ({years}) to {output} ({format}, source: {source})...[/bold blue]"
+    )
 
     if format == "parquet":
-        to_parquet(path=output, dataset=dataset, years=year_list, force=force)
+        to_parquet(path=output, dataset=dataset, years=year_list, source=source, force=force)
     else:
         from retrosheetpy.sink.file_sink import FileSink
 
         sink = FileSink()
         d = dataset.lower()
         if d == "parks":
-            tbl = parks(backend="arrow", force=force)
+            tbl = parks(backend="arrow", source=source, force=force)
         elif d == "bio":
-            tbl = bio(backend="arrow", force=force)
+            tbl = bio(backend="arrow", source=source, force=force)
         elif d == "ejections":
-            tbl = ejections(backend="arrow", force=force)
+            tbl = ejections(backend="arrow", source=source, force=force)
         elif d == "transactions":
-            tbl = transactions(backend="arrow", force=force)
+            tbl = transactions(backend="arrow", source=source, force=force)
         elif d == "rosters":
-            tbl = rosters(year=year_list, backend="arrow", force=force)
+            tbl = rosters(year=year_list, backend="arrow", source=source, force=force)
         elif d == "schedules":
-            tbl = schedules(year=year_list, backend="arrow", force=force)
+            tbl = schedules(year=year_list, backend="arrow", source=source, force=force)
         elif d in ("gamelogs", "game_logs"):
-            tbl = game_logs(year=year_list, backend="arrow", force=force)
+            tbl = game_logs(year=year_list, backend="arrow", source=source, force=force)
         elif d == "postseason":
-            tbl = postseason(year=year_list, backend="arrow", force=force)
+            tbl = postseason(year=year_list, backend="arrow", source=source, force=force)
         elif d == "allstar":
-            tbl = allstar(year=year_list, backend="arrow", force=force)
+            tbl = allstar(year=year_list, backend="arrow", source=source, force=force)
         else:
             from retrosheetpy.api import events
 
-            tbl = events(year=year_list, backend="arrow", force=force)
+            tbl = events(year=year_list, backend="arrow", source=source, force=force)
         sink.write_csv(output, tbl)
 
     console.print(f"[bold green]✓ Export complete: {output}[/bold green]")

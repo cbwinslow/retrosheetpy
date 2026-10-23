@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pyarrow as pa
 
+from retrosheetpy.extract.config import DownloaderConfig
 from retrosheetpy.extract.downloader import Downloader
 from retrosheetpy.parse.bio import BioParser
 from retrosheetpy.parse.ejections import EjectionParser
@@ -39,14 +41,27 @@ def _normalize_years(years: int | Sequence[int]) -> list[int]:
     return list(years)
 
 
+def _resolve_downloader(
+    downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
+) -> Downloader:
+    """Helper to instantiate or configure a Downloader with the desired source."""
+    if downloader is not None:
+        if source is not None:
+            downloader.source = source
+        return downloader
+    return Downloader(config=DownloaderConfig(source=source or "github"))
+
+
 def events(
     year: int | Sequence[int],
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads, parses, and returns play-by-play events as a strongly-typed DataFrame or Arrow Table."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = EventParser()
     year_list = _normalize_years(year)
     tables: list[pa.Table] = []
@@ -73,9 +88,10 @@ def postseason(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads, parses, and returns postseason play-by-play events."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = EventParser()
     year_list = _normalize_years(year)
     tables: list[pa.Table] = []
@@ -106,9 +122,10 @@ def allstar(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads, parses, and returns All-Star Game play-by-play events."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = EventParser()
     year_list = _normalize_years(year)
     tables: list[pa.Table] = []
@@ -139,16 +156,17 @@ def game_logs(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads, parses, and returns official game logs as a strongly-typed DataFrame or Arrow Table."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = GameLogParser()
     year_list = _normalize_years(year)
     tables: list[pa.Table] = []
 
     for y in year_list:
         extracted_dir = dl.get_gamelogs(y, force=force)
-        gl_files = list(extracted_dir.glob("gl*.txt"))
+        gl_files = sorted(list(extracted_dir.glob("*.[tT][xX][tT]")))
         if gl_files:
             tbl = parser.parse_files(gl_files)
             tables.append(tbl)
@@ -168,16 +186,17 @@ def rosters(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
-    """Downloads event archives to parse and return team rosters as a strongly-typed table."""
-    dl = downloader or Downloader()
+    """Downloads, parses, and returns annual team roster files (.ROS)."""
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = RosterParser()
     year_list = _normalize_years(year)
     tables: list[pa.Table] = []
 
     for y in year_list:
         extracted_dir = dl.get_events(y, force=force)
-        ros_files = list(extracted_dir.glob("*.ROS"))
+        ros_files = sorted(list(extracted_dir.glob("*.ROS")))
         if ros_files:
             tbl = parser.parse_files(ros_files, year=y)
             tables.append(tbl)
@@ -196,9 +215,10 @@ def parks(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
-    """Downloads and returns the official ballpark encyclopedia table."""
-    dl = downloader or Downloader()
+    """Downloads and returns the official Retrosheet ballpark directory."""
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = ParkParser()
     file_path = dl.get_parks(force=force)
     table = parser.parse_file(file_path)
@@ -206,13 +226,14 @@ def parks(
 
 
 def schedules(
-    year: int | Sequence[int],
+    year: int | Sequence[int] = 2024,
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads, parses, and returns official regular season game schedules."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = ScheduleParser()
     year_list = _normalize_years(year)
     tables: list[pa.Table] = []
@@ -242,9 +263,10 @@ def bio(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads and returns the master player and personnel biographical database."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = BioParser()
     file_path = dl.get_bio(force=force)
     table = parser.parse_file(file_path)
@@ -255,9 +277,10 @@ def ejections(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
     """Downloads and returns the official ejections database."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = EjectionParser()
     file_path = dl.get_ejections(force=force)
     table = parser.parse_file(file_path)
@@ -268,9 +291,14 @@ def transactions(
     backend: str = "arrow",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Any:
-    """Downloads and returns the official player transactions database."""
-    dl = downloader or Downloader()
+    """Downloads and returns the historical player transactions database.
+
+    Note: Upstream Retrosheet discontinued updating transactions on November 26, 2021,
+    transitioning ongoing maintenance to Baseball-Reference.
+    """
+    dl = _resolve_downloader(downloader=downloader, source=source)
     parser = TransactionParser()
     file_path = dl.get_transactions(force=force)
     table = parser.parse_file(file_path)
@@ -283,9 +311,10 @@ def to_duckdb(
     datasets: Sequence[str] = ("events", "gamelogs", "rosters", "parks"),
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> None:
     """Ingests selected Retrosheet datasets into a DuckDB database."""
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     sink = DuckDBSink(db_path=path)
 
     try:
@@ -304,8 +333,15 @@ def to_duckdb(
             sink.write_table("ejections", tbl_ej)
 
         if "transactions" in ds_set:
-            tbl_tr = transactions(backend="arrow", force=force, downloader=dl)
-            sink.write_table("transactions", tbl_tr)
+            try:
+                tbl_tr = transactions(backend="arrow", force=force, downloader=dl)
+                sink.write_table("transactions", tbl_tr)
+            except FileNotFoundError as err:
+                warnings.warn(
+                    f"Skipping transactions dataset in DuckDB ingestion: {err}",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
         if "schedules" in ds_set:
             tbl_sked = schedules(year=years, backend="arrow", force=force, downloader=dl)
@@ -340,12 +376,13 @@ def to_parquet(
     years: int | Sequence[int] = 2024,
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> Path:
-    """Exports a specified dataset into a Parquet file."""
-    dl = downloader or Downloader()
+    """Exports a specific Retrosheet dataset to a Parquet file."""
+    dl = _resolve_downloader(downloader=downloader, source=source)
     sink = FileSink()
-    d = dataset.lower()
 
+    d = dataset.lower()
     if d == "events":
         tbl = events(year=years, backend="arrow", force=force, downloader=dl)
     elif d == "postseason":
@@ -385,9 +422,10 @@ def to_dlt(
     datasets: Sequence[str] = ("events", "gamelogs", "rosters", "parks"),
     pipeline_name: str = "retrosheet",
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
     **dlt_kwargs: Any,
 ) -> Any:
-    """Runs a full dlt pipeline ingesting Retrosheet datasets into Postgres, Snowflake, BigQuery, etc."""
+    """Runs a full dlt pipeline ingesting Retrosheet datasets into Postgres, Snowflake, DuckDB, etc."""
     try:
         import dlt
     except ImportError as err:
@@ -397,9 +435,10 @@ def to_dlt(
 
     from retrosheetpy.sink.dlt_sink import retrosheet_source
 
+    dl = _resolve_downloader(downloader=downloader, source=source)
     pipeline = dlt.pipeline(pipeline_name=pipeline_name, destination=destination, **dlt_kwargs)
-    source = retrosheet_source(years=years, datasets=datasets, downloader=downloader)
-    return pipeline.run(source)
+    src = retrosheet_source(years=years, datasets=datasets, downloader=dl)
+    return pipeline.run(src)
 
 
 def download(
@@ -407,6 +446,7 @@ def download(
     datasets: Sequence[str] | str = "all",
     force: bool = False,
     downloader: Downloader | None = None,
+    source: Literal["github", "retrosheet", "auto"] | None = None,
 ) -> dict[str, list[Path]]:
     """Downloads specified Retrosheet archives to local cache without loading them into memory.
 
@@ -417,11 +457,12 @@ def download(
              'schedules', 'bio', 'ejections', 'transactions', or 'all').
         force: If True, re-downloads even if already cached.
         downloader: Optional custom Downloader instance.
+        source: Optional source override ('github', 'retrosheet', or 'auto').
 
     Returns:
         Dictionary mapping dataset name to list of extracted paths or file locations.
     """
-    dl = downloader or Downloader()
+    dl = _resolve_downloader(downloader=downloader, source=source)
     results: dict[str, list[Path]] = {}
 
     all_supported = [
@@ -429,6 +470,7 @@ def download(
         "postseason",
         "allstar",
         "gamelogs",
+        "rosters",
         "parks",
         "schedules",
         "bio",
@@ -438,17 +480,17 @@ def download(
 
     if isinstance(datasets, str):
         if datasets.lower() == "all":
-            dataset_list = all_supported
+            selected = all_supported
         else:
-            dataset_list = [d.strip().lower() for d in datasets.split(",")]
+            selected = [d.strip().lower() for d in datasets.split(",") if d.strip()]
     else:
-        dataset_list = [d.lower() for d in datasets]
+        selected = [d.lower() for d in datasets]
 
     year_list = _normalize_years(years) if years is not None else [2024]
 
-    for d in dataset_list:
+    for d in selected:
         results[d] = []
-        if d in ("events", "rosters"):
+        if d == "events":
             for y in year_list:
                 p = dl.get_events(y, force=force)
                 results[d].append(p)
@@ -464,6 +506,10 @@ def download(
             for y in year_list:
                 p = dl.get_gamelogs(y, force=force)
                 results[d].append(p)
+        elif d == "rosters":
+            for y in year_list:
+                p = dl.get_events(y, force=force)
+                results[d].append(p)
         elif d == "schedules":
             for y in year_list:
                 p = dl.get_schedules(y, force=force)
@@ -478,7 +524,14 @@ def download(
             p = dl.get_ejections(force=force)
             results[d].append(p)
         elif d == "transactions":
-            p = dl.get_transactions(force=force)
-            results[d].append(p)
+            try:
+                p = dl.get_transactions(force=force)
+                results[d].append(p)
+            except FileNotFoundError as err:
+                warnings.warn(
+                    f"Skipping transactions download: {err}",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
     return results
