@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/cbwinslow/retrosheetpy/compare/v2.1.0...v2.2.0) (2026-10-23)
+
+
+### Features
+
+* **extract,sink:** add GitHub raw CDN downloader, modern dlt/polars/pydantic stack ([#38](https://github.com/cbwinslow/retrosheetpy/issues/38)) ([196a986](https://github.com/cbwinslow/retrosheetpy/commit/196a98694ed12a69f531b516c0303a3cf1e09022))
+
 ## [2.1.0](https://github.com/cbwinslow/retrosheetpy/compare/v2.0.0...v2.1.0) (2026-10-13)
 
 
