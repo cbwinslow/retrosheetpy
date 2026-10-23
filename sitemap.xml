@@ -2,98 +2,98 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/DECISIONS/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/api/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/cli/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/cookbook/park-factors/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/cookbook/platoon-splits/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/cookbook/production-pipelines/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/cookbook/run-expectancy/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/bio/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/ejections/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/events/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/gamelogs/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/parks/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/postseason-allstar/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/rosters/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/schedules/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/datasets/transactions/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/getting-started/architecture/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/getting-started/installation/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/getting-started/quickstart/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/storage/dlt-pipelines/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/storage/duckdb/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/storage/parquet-arrow/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
     <url>
          <loc>https://cbwinslow.github.io/retrosheetpy/storage/sql-ddl/</loc>
-         <lastmod>2026-10-13</lastmod>
+         <lastmod>2026-10-23</lastmod>
     </url>
 </urlset>
