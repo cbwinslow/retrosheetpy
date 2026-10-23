@@ -429,9 +429,7 @@ def to_dlt(
     try:
         import dlt
     except ImportError as err:
-        raise ImportError(
-            "dlt is not installed. Install it via 'pip install retrosheetpy[dlt]' or 'pip install dlt'."
-        ) from err
+        raise ImportError("dlt is not installed. Install it via 'pip install dlt'.") from err
 
     from retrosheetpy.sink.dlt_sink import retrosheet_source
 

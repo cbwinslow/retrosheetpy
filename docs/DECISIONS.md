@@ -85,3 +85,17 @@ Previously, `dlt_sink.py` converted PyArrow Table batches to Python dictionaries
 
 ### Decision
 Refactor all `@dlt.resource` definitions in `src/retrosheetpy/sink/dlt_sink.py` to yield PyArrow Tables (`pa.Table`) directly. `dlt` natively consumes Arrow tables and batches with zero-copy throughput.
+
+---
+
+## ADR 7: HTTP Session Pooling and Resilient Season Extraction
+
+* **Date:** 2026-10-23
+* **Status:** Accepted
+
+### Context
+When downloading uncompressed seasons via the GitHub raw CDN, `Downloader` requests ~60 files per season (team manifests, individual team event files, and rosters). Recreating `httpx.Client()` on each request introduced connection overhead. Furthermore, raw download loops previously swallowed all exceptions indiscriminately, risking partial cache directories during network dropouts.
+
+### Decision
+1. Lazily manage a persistent `httpx.Client` on `Downloader` with connection pooling, and implement `close()`, `__enter__`, `__exit__`, and `__del__` for resource cleanup.
+2. In `_get_events_github`, distinguish expected HTTP 404s (teams with no separate event files) from network transport/timeout errors. Network errors immediately raise and clean up partial season directories to prevent cache corruption.

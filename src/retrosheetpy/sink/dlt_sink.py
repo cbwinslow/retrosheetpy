@@ -30,9 +30,7 @@ def retrosheet_source(
     try:
         import dlt
     except ImportError as err:
-        raise ImportError(
-            "dlt is not installed. Install it via 'pip install retrosheetpy[dlt]' or 'pip install dlt'."
-        ) from err
+        raise ImportError("dlt is not installed. Install it via 'pip install dlt'.") from err
 
     dl = downloader or Downloader(config=DownloaderConfig(source=source_type or "github"))  # type: ignore[arg-type]
     year_list = [years] if isinstance(years, int) else list(years)

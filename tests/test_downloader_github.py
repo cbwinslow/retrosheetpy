@@ -88,3 +88,73 @@ def test_downloader_auto_fallback_warning(tmp_path: Path, monkeypatch: pytest.Mo
 
     assert path.exists()
     assert "Fenway" in path.read_text()
+
+
+def test_downloader_context_manager_and_session_reuse(tmp_path: Path) -> None:
+    cache = CacheManager(cache_dir=tmp_path / "cache")
+    with Downloader(cache=cache) as dl:
+        client1 = dl._get_client()
+        client2 = dl._get_client()
+        assert client1 is client2
+        assert not client1.is_closed
+
+    assert client1.is_closed
+
+
+def test_downloader_github_events_network_error_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import httpx
+
+    cache = CacheManager(cache_dir=tmp_path / "cache")
+    config = DownloaderConfig(source="github")
+    dl = Downloader(cache=cache, config=config)
+
+    team_manifest = "BOS,A,Boston,Red Sox\nNYN,N,New York,Mets\n"
+
+    def mock_fetch(url: str) -> bytes:
+        if "TEAM2024" in url:
+            return team_manifest.encode("utf-8")
+        if "2024BOS.EVA" in url:
+            # Simulate network timeout mid-download
+            raise httpx.ConnectTimeout("Connection timed out to raw CDN")
+        return b""
+
+    monkeypatch.setattr(dl, "_fetch_bytes", mock_fetch)
+
+    with pytest.raises(httpx.ConnectTimeout):
+        dl.get_events(2024)
+
+    # Verify partial directory was wiped cleanly
+    extracted_dir = cache.get_extracted_dir("events", 2024)
+    assert not extracted_dir.exists()
+
+
+def test_downloader_github_events_tolerates_404(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import httpx
+
+    cache = CacheManager(cache_dir=tmp_path / "cache")
+    config = DownloaderConfig(source="github")
+    dl = Downloader(cache=cache, config=config)
+
+    team_manifest = "BOS,A,Boston,Red Sox\nOLD,N,Old Team,Nonexistent\n"
+    bos_events = "id,BOS202404010\nplay,1,0,deve001,00,FB,HR\n"
+
+    def mock_fetch(url: str) -> bytes:
+        if "TEAM2024" in url:
+            return team_manifest.encode("utf-8")
+        if "2024BOS.EVA" in url:
+            return bos_events.encode("utf-8")
+        # 404 for OLD team
+        req = httpx.Request("GET", url)
+        resp = httpx.Response(status_code=404, request=req)
+        raise httpx.HTTPStatusError("Not found", request=req, response=resp)
+
+    monkeypatch.setattr(dl, "_fetch_bytes", mock_fetch)
+
+    events_dir = dl.get_events(2024)
+    assert events_dir.exists()
+    assert (events_dir / "2024BOS.EVA").exists()
+    assert not (events_dir / "2024OLD.EVN").exists()

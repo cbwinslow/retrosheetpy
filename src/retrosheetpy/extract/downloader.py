@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 import warnings
 from pathlib import Path
+from types import TracebackType
 from typing import Literal
 
 import httpx
@@ -40,23 +42,56 @@ class Downloader:
         self.manifest = manifest or Manifest.from_config(self.config)
         self.timeout = self.config.timeout
         self.source: Literal["github", "retrosheet", "auto"] = self.config.source
+        self._client: httpx.Client | None = None
+
+    def _get_client(self) -> httpx.Client:
+        """Returns or lazily creates a persistent HTTP client with connection pooling."""
+        if self._client is None or self._client.is_closed:
+            headers = {"User-Agent": "retrosheetpy/2.1 (https://github.com/cbwinslow/retrosheetpy)"}
+            if self.config.github_token:
+                headers["Authorization"] = f"Bearer {self.config.github_token}"
+            self._client = httpx.Client(
+                follow_redirects=True,
+                timeout=self.timeout,
+                headers=headers,
+            )
+        return self._client
+
+    def close(self) -> None:
+        """Closes the underlying HTTP client session and releases socket resources."""
+        if self._client is not None and not self._client.is_closed:
+            self._client.close()
+            self._client = None
+
+    def __enter__(self) -> Downloader:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        self.close()
 
     def _fetch_bytes(self, url: str) -> bytes:
-        """Internal HTTP GET fetcher with timeout and retry handling."""
-        headers = {"User-Agent": "retrosheetpy/2.1 (https://github.com/cbwinslow/retrosheetpy)"}
-        if self.config.github_token and "github" in url:
-            headers["Authorization"] = f"Bearer {self.config.github_token}"
-
+        """Internal HTTP GET fetcher with timeout, retry, and connection pooling."""
+        client = self._get_client()
         last_exc: Exception | None = None
         for attempt in range(max(1, self.config.max_retries)):
             try:
-                with httpx.Client(
-                    follow_redirects=True, timeout=self.timeout, headers=headers
-                ) as client:
-                    resp = client.get(url)
-                    resp.raise_for_status()
-                    return resp.content
-            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError) as exc:
+                resp = client.get(url)
+                resp.raise_for_status()
+                return resp.content
+            except (
+                httpx.ConnectTimeout,
+                httpx.ReadTimeout,
+                httpx.ConnectError,
+                httpx.RemoteProtocolError,
+            ) as exc:
                 last_exc = exc
                 if attempt + 1 == self.config.max_retries:
                     raise
@@ -100,43 +135,62 @@ class Downloader:
         team_manifest_file.write_bytes(manifest_bytes)
 
         lines = manifest_bytes.decode("utf-8", errors="replace").splitlines()
-        for line in lines:
-            line_str = line.strip()
-            if not line_str or "," not in line_str:
-                continue
-            parts = line_str.split(",")
-            team_id = parts[0].strip()
-            league = parts[1].strip().upper() if len(parts) > 1 else "A"
+        downloaded_events = 0
+        try:
+            for line in lines:
+                line_str = line.strip()
+                if not line_str or "," not in line_str:
+                    continue
+                parts = line_str.split(",")
+                team_id = parts[0].strip()
+                league = parts[1].strip().upper() if len(parts) > 1 else "A"
 
-            event_ext = ".EVA" if league == "A" else ".EVN"
-            event_filename = f"{year}{team_id}{event_ext}"
-            roster_filename = f"{team_id}{year}.ROS"
+                event_ext = ".EVA" if league == "A" else ".EVN"
+                event_filename = f"{year}{team_id}{event_ext}"
+                roster_filename = f"{team_id}{year}.ROS"
 
-            # Fetch team event file
-            try:
-                event_bytes = self._fetch_bytes(
-                    self.manifest.github_season_file_url(year, event_filename)
+                # Fetch team event file
+                try:
+                    event_bytes = self._fetch_bytes(
+                        self.manifest.github_season_file_url(year, event_filename)
+                    )
+                    (extracted_dir / event_filename).write_bytes(event_bytes)
+                    downloaded_events += 1
+                except httpx.HTTPStatusError as err:
+                    if err.response.status_code != 404:
+                        raise
+                except (httpx.TransportError, httpx.TimeoutException):
+                    raise
+
+                # Fetch team roster file
+                try:
+                    roster_bytes = self._fetch_bytes(
+                        self.manifest.github_season_file_url(year, roster_filename)
+                    )
+                    (extracted_dir / roster_filename).write_bytes(roster_bytes)
+                except httpx.HTTPStatusError as err:
+                    if err.response.status_code != 404:
+                        raise
+                except (httpx.TransportError, httpx.TimeoutException):
+                    raise
+
+            # Try to fetch season schedule and league event files if available
+            for extra in [f"{year}schedule.csv", f"{year}.EBA", f"{year}.EBE", f"{year}.EBN"]:
+                try:
+                    content = self._fetch_bytes(self.manifest.github_season_file_url(year, extra))
+                    (extracted_dir / extra).write_bytes(content)
+                except Exception:
+                    pass
+
+            if downloaded_events == 0:
+                raise FileNotFoundError(
+                    f"No team event files were found on GitHub mirror for {year}"
                 )
-                (extracted_dir / event_filename).write_bytes(event_bytes)
-            except Exception:
-                pass
 
-            # Fetch team roster file
-            try:
-                roster_bytes = self._fetch_bytes(
-                    self.manifest.github_season_file_url(year, roster_filename)
-                )
-                (extracted_dir / roster_filename).write_bytes(roster_bytes)
-            except Exception:
-                pass
-
-        # Try to fetch season schedule and league event files if available
-        for extra in [f"{year}schedule.csv", f"{year}.EBA", f"{year}.EBE", f"{year}.EBN"]:
-            try:
-                content = self._fetch_bytes(self.manifest.github_season_file_url(year, extra))
-                (extracted_dir / extra).write_bytes(content)
-            except Exception:
-                pass
+        except Exception:
+            # Clean up partial directory on failure to avoid cache poisoning
+            shutil.rmtree(extracted_dir, ignore_errors=True)
+            raise
 
         return extracted_dir
 
@@ -192,8 +246,11 @@ class Downloader:
                         extracted_dir.mkdir(parents=True, exist_ok=True)
                         (extracted_dir / fname).write_bytes(content)
                         found += 1
-                    except Exception:
-                        pass
+                    except httpx.HTTPStatusError as err:
+                        if err.response.status_code != 404:
+                            raise
+                    except (httpx.TransportError, httpx.TimeoutException):
+                        raise
                 if found > 0:
                     return extracted_dir
                 if self.source == "github":
