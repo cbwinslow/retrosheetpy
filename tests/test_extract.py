@@ -25,6 +25,40 @@ def test_manifest_urls() -> None:
     assert manifest.postseason_archive_url(2024) == "https://www.retrosheet.org/events/2024post.zip"
     assert manifest.allstar_archive_url(2024) == "https://www.retrosheet.org/events/2024as.zip"
 
+    # GitHub Raw CDN URLs
+    assert (
+        manifest.github_park_url()
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/reference/ballparks.csv"
+    )
+    assert (
+        manifest.github_bio_url()
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/reference/biofile0.csv"
+    )
+    assert (
+        manifest.github_bio_fallback_url()
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/reference/biofile.csv"
+    )
+    assert (
+        manifest.github_ejections_url()
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/reference/ejections.csv"
+    )
+    assert (
+        manifest.github_gamelog_url(2023)
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/seasons/2023/GL2023.TXT"
+    )
+    assert (
+        manifest.github_schedule_url(2023)
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/seasons/2023/2023schedule.csv"
+    )
+    assert (
+        manifest.github_team_manifest_url(2023)
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/seasons/2023/TEAM2023"
+    )
+    assert (
+        manifest.github_season_file_url(2023, "2023BOS.EVA")
+        == "https://raw.githubusercontent.com/chadwickbureau/retrosheet/master/seasons/2023/2023BOS.EVA"
+    )
+
 
 def test_cache_manager(tmp_path: Path) -> None:
     cache = CacheManager(cache_dir=tmp_path)

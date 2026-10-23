@@ -6,12 +6,12 @@
 
 ---
 
-## Installation
+## Out-of-the-Box Ingestion
 
-Ensure the `dlt` extra is installed:
+`dlt` is included directly in `retrosheetpy`'s core dependencies. `retrosheetpy`'s dlt sources yield native PyArrow Tables (`pyarrow.Table`) directly into `dlt` without converting rows to Python dictionaries, ensuring zero-copy throughput and strict type preservation into destination databases.
 
 ```bash
-pip install "retrosheetpy[dlt]"
+pip install retrosheetpy
 ```
 
 ---

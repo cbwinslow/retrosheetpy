@@ -15,7 +15,7 @@
 
 `retrosheetpy` brings modern data workflows to [Retrosheet](https://www.retrosheet.org) baseball archives. It enables baseball researchers, analysts, professors, and DBAs to download, parse, and ingest play-by-play events, historical game logs, rosters, and ballparks directly into **DuckDB, Parquet, Polars, pandas, and SQL databases** with **strongly-typed schemas** (integers, dates, booleans—never raw text dumps).
 
-Powered by [`chadwickpy`](https://github.com/cbwinslow/chadwickpy) for multi-core play-by-play parsing with **zero C compiler dependencies**.
+Downloads default to the fast, rate-limit-free GitHub Fastly raw CDN mirror (`chadwickbureau/retrosheet`) with automatic fallback to `retrosheet.org`. Powered by [`chadwickpy`](https://github.com/cbwinslow/chadwickpy) for multi-core play-by-play parsing with **zero C compiler dependencies**.
 
 ---
 
